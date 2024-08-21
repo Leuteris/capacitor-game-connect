@@ -3,6 +3,7 @@ import { WebPlugin } from '@capacitor/core';
 import type { CapacitorGameConnectPlugin } from './definitions';
 import type { PlayerScore } from './interfaces/player-score.interface';
 import type { User } from './interfaces/user.interface';
+import { SnapshotData } from './interfaces/snapshot-data.interface';
 
 export class CapacitorGameConnectWeb
   extends WebPlugin
@@ -27,7 +28,17 @@ export class CapacitorGameConnectWeb
     return Promise.resolve();
   }
 
-  /**
+  async saveGame(options: { snapshotID: string, data: string }): Promise<void> {
+    console.info('saveGame function has been called', options);
+    return Promise.resolve();
+  }
+
+  async loadGame(options: { snapshotID: string }): Promise<SnapshotData> {
+    console.info('load game function has been called', options);
+    return Promise.resolve({} as SnapshotData);
+  }
+
+    /**
    * * Method to submit a score to the Google Play Services SDK
    *
    * @returns Promise

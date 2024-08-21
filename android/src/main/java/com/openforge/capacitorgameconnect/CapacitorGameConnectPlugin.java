@@ -76,6 +76,17 @@ public class CapacitorGameConnectPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void saveGame(PluginCall call) {
+        implementation.saveGame(call);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void loadGame(PluginCall call) {
+        implementation.loadGame(call);
+    }
+
+    @PluginMethod
     public void submitScore(PluginCall call) {
         implementation.submitScore(call);
         call.resolve();

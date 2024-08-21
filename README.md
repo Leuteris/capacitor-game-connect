@@ -146,6 +146,8 @@ Before use the `Achievement Methods` of the plugin, you need to setup your Achie
 
 * [`signIn()`](#signin)
 * [`showLeaderboard(...)`](#showleaderboard)
+* [`saveGame(...)`](#savegame)
+* [`loadGame(...)`](#loadgame)
 * [`submitScore(...)`](#submitscore)
 * [`showAchievements()`](#showachievements)
 * [`unlockAchievement(...)`](#unlockachievement)
@@ -182,6 +184,34 @@ showLeaderboard(options: { leaderboardID: string; }) => Promise<void>
 | Param         | Type                                    |
 | ------------- | --------------------------------------- |
 | **`options`** | <code>{ leaderboardID: string; }</code> |
+
+--------------------
+
+
+### saveGame(...)
+
+```typescript
+saveGame(options: { snapshotID: string; data: string; }) => Promise<void>
+```
+
+| Param         | Type                                               |
+| ------------- | -------------------------------------------------- |
+| **`options`** | <code>{ snapshotID: string; data: string; }</code> |
+
+--------------------
+
+
+### loadGame(...)
+
+```typescript
+loadGame(options: { snapshotID: string; }) => Promise<SnapshotData>
+```
+
+| Param         | Type                                 |
+| ------------- | ------------------------------------ |
+| **`options`** | <code>{ snapshotID: string; }</code> |
+
+**Returns:** <code>Promise&lt;<a href="#snapshotdata">SnapshotData</a>&gt;</code>
 
 --------------------
 
@@ -260,6 +290,13 @@ getUserTotalScore(options: { leaderboardID: string; }) => Promise<PlayerScore>
 
 
 ### Interfaces
+
+
+#### SnapshotData
+
+| Prop                | Type                |
+| ------------------- | ------------------- |
+| **`snapshot_data`** | <code>string</code> |
 
 
 #### PlayerScore

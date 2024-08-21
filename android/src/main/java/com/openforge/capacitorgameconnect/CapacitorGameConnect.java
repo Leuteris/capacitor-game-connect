@@ -10,10 +10,19 @@ import com.getcapacitor.PluginCall;
 import com.google.android.gms.games.AnnotatedData;
 import com.google.android.gms.games.GamesSignInClient;
 import com.google.android.gms.games.PlayGames;
+import com.google.android.gms.games.SnapshotsClient;
+import com.google.android.gms.games.SnapshotsClient.DataOrConflict;
 import com.google.android.gms.games.leaderboard.LeaderboardScore;
 import com.google.android.gms.games.leaderboard.LeaderboardVariant;
+import com.google.android.gms.games.snapshot.SnapshotMetadata;
+import com.google.android.gms.games.snapshot.SnapshotMetadataChange;
+import com.google.android.gms.tasks.Continuation;
+import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
+import  com.google.android.gms.games.snapshot.Snapshot;
+import java.io.IOException;
 
 public class CapacitorGameConnect {
 
@@ -58,6 +67,57 @@ public class CapacitorGameConnect {
             )
             .addOnFailureListener(e -> resultCallback.error(e.getMessage()));
     }
+
+  public void saveGame(PluginCall call) {
+    Log.i(TAG, "saveGame method called");
+
+    String data = call.getString("data");
+    String snapshotId = call.getString("snapshotID");
+
+    byte[] byteArray = data.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+
+    SnapshotsClient snapshotsClient = PlayGames.getSnapshotsClient(this.activity);
+
+    snapshotsClient.open(snapshotId, true)
+        .addOnCompleteListener(task -> {
+          Snapshot snapshot = task.getResult().getData();
+
+          if (snapshot != null) {
+            //call of the method writeSnapshot params : the snapshot and the data we
+            //want to save with a description
+            writeSnapshot(snapshot, byteArray, "description")
+                .addOnCompleteListener(t -> {
+                  if (t.isSuccessful()) {
+                    Log.i(TAG, "saveGame completed successful");
+                  } else {
+                    Log.e("ERR", "saveGame failed " + t.getException());
+                  }
+                });
+          }
+        });
+  }
+
+  public void loadGame(PluginCall call) {
+    Log.i(TAG, "load game called");
+
+    String snapshotId = call.getString("snapshotID");
+    loadSnapshot(snapshotId)
+        .addOnSuccessListener(data -> {
+          Log.i(TAG, "load game completed successfully: " + new String(data));
+          JSObject result = new JSObject();
+          result.put("snapshot_data", new String(data));
+          call.resolve(result);
+        })
+        .addOnFailureListener(
+            new OnFailureListener() {
+              @Override
+              public void onFailure(@NonNull Exception e) {
+                Log.e("ERR", "saveGame failed " + e.getMessage());
+                call.reject("Error loading game" + e.getMessage());
+              }
+            }
+        );
+  }
 
     /**
      * * Method to fetch the logged in Player
@@ -187,4 +247,54 @@ public class CapacitorGameConnect {
                 }
             );
     }
+
+  private Task<SnapshotMetadata> writeSnapshot(Snapshot snapshot, byte[] data, String desc) {
+    // Set the data payload for the snapshot
+    snapshot.getSnapshotContents().writeBytes(data);
+
+    // Create the change operation
+    SnapshotMetadataChange metadataChange = new SnapshotMetadataChange.Builder()
+        //.setCoverImage(coverImage)
+        .setDescription(desc)
+        .build();
+
+
+    SnapshotsClient snapshotsClient =
+        PlayGames.getSnapshotsClient(this.activity);
+
+    // Commit the operation
+    return snapshotsClient.commitAndClose(snapshot, metadataChange);
+  }
+
+  private Task<byte[]> loadSnapshot(String snapshotID) {
+    SnapshotsClient snapshotsClient =
+        PlayGames.getSnapshotsClient(this.activity);
+
+    // In the case of a conflict, the most recently modified version of this snapshot will be used.
+    int conflictResolutionPolicy = SnapshotsClient.RESOLUTION_POLICY_MOST_RECENTLY_MODIFIED;
+
+    // Open the saved game using its name
+    return snapshotsClient.open(snapshotID, true, conflictResolutionPolicy)
+        .addOnFailureListener(new OnFailureListener() {
+          @Override
+          public void onFailure(@NonNull Exception e) {
+            Log.e(TAG, "Error while opening Snapshot.", e);
+          }
+        }).continueWith(new Continuation<DataOrConflict<Snapshot>, byte[]>() {
+          @Override
+          public byte[] then(@NonNull Task<SnapshotsClient.DataOrConflict<Snapshot>> task) throws Exception {
+            Snapshot snapshot = task.getResult().getData();
+
+            // Opening the snapshot was a success and any conflicts have been resolved.
+            try {
+              // Extract the raw data from the snapshot.
+              return snapshot.getSnapshotContents().readFully();
+            } catch (IOException e) {
+              Log.e(TAG, "Error while reading Snapshot.", e);
+            }
+
+            return null;
+          }
+        });
+  }
 }
