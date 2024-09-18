@@ -7,7 +7,10 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PluginCall;
+import com.google.android.gms.common.api.ApiException;
+import com.google.android.gms.common.api.CommonStatusCodes;
 import com.google.android.gms.games.AnnotatedData;
+import com.google.android.gms.games.AuthenticationResult;
 import com.google.android.gms.games.GamesSignInClient;
 import com.google.android.gms.games.PlayGames;
 import com.google.android.gms.games.SnapshotsClient;
@@ -17,7 +20,6 @@ import com.google.android.gms.games.leaderboard.LeaderboardVariant;
 import com.google.android.gms.games.snapshot.SnapshotMetadata;
 import com.google.android.gms.games.snapshot.SnapshotMetadataChange;
 import com.google.android.gms.tasks.Continuation;
-import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
@@ -44,28 +46,32 @@ public class CapacitorGameConnect {
         GamesSignInClient gamesSignInClient = PlayGames.getGamesSignInClient(this.activity);
 
         gamesSignInClient
-            .isAuthenticated()
-            .addOnCompleteListener(
-                isAuthenticatedTask -> {
-                    boolean isAuthenticated = (isAuthenticatedTask.isSuccessful() && isAuthenticatedTask.getResult().isAuthenticated());
+                .isAuthenticated()
+                .addOnCompleteListener(
+                        isAuthenticatedTask -> onCompleteIsAuthenticated(resultCallback, isAuthenticatedTask, gamesSignInClient)
+                )
+                .addOnFailureListener(e -> resultCallback.error(e.getMessage()));
+    }
 
-                    if (isAuthenticated) {
-                        Log.i(TAG, "User is already authenticated");
-                        resultCallback.success();
-                    } else {
-                        gamesSignInClient
-                            .signIn()
-                            .addOnCompleteListener(
-                                data -> {
-                                    Log.i(TAG, "Sign-in completed successful");
-                                    resultCallback.success();
-                                }
-                            )
-                            .addOnFailureListener(e -> resultCallback.error(e.getMessage()));
-                    }
-                }
-            )
-            .addOnFailureListener(e -> resultCallback.error(e.getMessage()));
+    public void isAuthenticated(PluginCall call, final AuthenticatedCallback resultCallback) {
+        Log.i(TAG, "isAuthenticated method called");
+        GamesSignInClient gamesSignInClient = PlayGames.getGamesSignInClient(this.activity);
+
+        gamesSignInClient
+                .isAuthenticated()
+                .addOnCompleteListener(
+                        isAuthenticatedTask -> {
+                            boolean isAuthenticated = (isAuthenticatedTask.isSuccessful() && isAuthenticatedTask.getResult().isAuthenticated());
+
+                            if (isAuthenticated) {
+                                Log.i(TAG, "User is already authenticated");
+                            } else {
+                                Log.i(TAG, "User is not authenticated");
+                            }
+                            resultCallback.success(isAuthenticated);
+                        }
+                )
+                .addOnFailureListener(e -> resultCallback.error(e.getMessage()));
     }
 
   public void saveGame(PluginCall call) {
@@ -77,8 +83,9 @@ public class CapacitorGameConnect {
     byte[] byteArray = data.getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
     SnapshotsClient snapshotsClient = PlayGames.getSnapshotsClient(this.activity);
+    int conflictResolutionPolicy = SnapshotsClient.RESOLUTION_POLICY_MOST_RECENTLY_MODIFIED;
 
-    snapshotsClient.open(snapshotId, true)
+    snapshotsClient.open(snapshotId, true, conflictResolutionPolicy)
         .addOnCompleteListener(task -> {
           Snapshot snapshot = task.getResult().getData();
 
@@ -126,14 +133,47 @@ public class CapacitorGameConnect {
      */
     public void fetchUserInformation(final PlayerResultCallback resultCallback) {
         PlayGames
-            .getPlayersClient(this.activity)
-            .getCurrentPlayer()
-            .addOnSuccessListener(
-                player -> {
-                    resultCallback.success(player);
-                }
-            )
-            .addOnFailureListener(e -> resultCallback.error(e.getMessage()));
+                .getPlayersClient(this.activity)
+                .getCurrentPlayer()
+                .addOnSuccessListener(
+                        player -> {
+                            resultCallback.success(player);
+                        }
+                )
+                .addOnFailureListener(e -> {
+                    handleFailure(resultCallback, e);
+                });
+    }
+
+    private static void handleFailure(PlayerResultCallback resultCallback, Exception e) {
+        if (e instanceof ApiException) {
+            Log.i(TAG, "fetchUserInformation failed...");
+            ApiException apiException = (ApiException) e;
+            int statusCode = apiException.getStatusCode();
+
+            switch (statusCode) {
+                case CommonStatusCodes.CANCELED:
+                    // User canceled the sign-in, continue without it
+                    Log.i(TAG, "User canceled sign-in. Proceeding without Play Games features.");
+                    resultCallback.success(null); // Indicate sign-in is skipped
+                    break;
+
+                case CommonStatusCodes.SIGN_IN_REQUIRED:
+                    // Sign-in required, but allow the user to skip it
+                    Log.i(TAG, "Sign-in required but skipped. Proceeding without Play Games features.");
+                    resultCallback.success(null); // Indicate sign-in is skipped
+                    break;
+
+                default:
+                    // Other errors, log and continue
+                    Log.e(TAG, "Sign-in failed with status code: " + statusCode);
+                    resultCallback.error("Sign-in failed with status code: " + statusCode);
+                    break;
+            }
+        } else {
+            Log.e(TAG, "Sign-in failed with exception: " + e.getMessage());
+            resultCallback.error(e.getMessage());
+        }
     }
 
     /**
@@ -246,6 +286,61 @@ public class CapacitorGameConnect {
                     }
                 }
             );
+    }
+
+    private void onCompleteIsAuthenticated(SignInCallback resultCallback, Task<AuthenticationResult> isAuthenticatedTask, GamesSignInClient gamesSignInClient) {
+        boolean isAuthenticated = (isAuthenticatedTask.isSuccessful() && isAuthenticatedTask.getResult().isAuthenticated());
+
+        if (isAuthenticated) {
+            Log.i(TAG, "User is authenticated");
+            resultCallback.success(true);
+        } else {
+            signIn(resultCallback, gamesSignInClient);
+        }
+    }
+
+    private void signIn(SignInCallback resultCallback, GamesSignInClient gamesSignInClient) {
+        gamesSignInClient
+                .signIn()
+                .addOnCompleteListener(
+                        data -> {
+                            Log.i(TAG, "Sign-in completed successful");
+                            resultCallback.success(true);
+                        }
+                )
+                .addOnFailureListener(e -> onSignInFailure(resultCallback, e));
+    }
+
+    private static void onSignInFailure(SignInCallback resultCallback, Exception e) {
+        if (e instanceof ApiException) {
+            Log.i(TAG, "User sign-in failed...");
+            ApiException apiException = (ApiException) e;
+            int statusCode = apiException.getStatusCode();
+
+            // TODO network error????
+            switch (statusCode) {
+                case CommonStatusCodes.CANCELED:
+                    // User canceled the sign-in, continue without it
+                    Log.i(TAG, "User canceled sign-in. Proceeding without Play Games features.");
+                    resultCallback.success(false); // Indicate sign-in is skipped
+                    break;
+
+                case CommonStatusCodes.SIGN_IN_REQUIRED:
+                    // Sign-in required, but allow the user to skip it
+                    Log.i(TAG, "Sign-in required but skipped. Proceeding without Play Games features.");
+                    resultCallback.success(false); // Indicate sign-in is skipped
+                    break;
+
+                default:
+                    // Other errors, log and continue
+                    Log.e(TAG, "Sign-in failed with status code: " + statusCode);
+                    resultCallback.error("Sign-in failed with status code: " + statusCode);
+                    break;
+            }
+        } else {
+            Log.e(TAG, "Sign-in failed with exception: " + e.getMessage());
+            resultCallback.error(e.getMessage());
+        }
     }
 
   private Task<SnapshotMetadata> writeSnapshot(Snapshot snapshot, byte[] data, String desc) {

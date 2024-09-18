@@ -1,6 +1,7 @@
 package com.openforge.capacitorgameconnect;
 
 import android.content.Intent;
+import android.util.Log;
 
 import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultCallback;
@@ -42,21 +43,83 @@ public class CapacitorGameConnectPlugin extends Plugin {
     public void signIn(PluginCall call) {
         implementation.signIn(call, new SignInCallback() {
             @Override
-            public void success() {
+            public void success(boolean isAuthenticated) {
+                if (!isAuthenticated) {
+                    JSObject ret = new JSObject();
+                    ret.put("player_id", null);
+                    ret.put("player_name", null);
+                    call.resolve(ret);
+                }
+
                 implementation.fetchUserInformation(new PlayerResultCallback() {
                     @Override
                     public void success(Player player) {
-                        String playerId = player.getPlayerId();
-                        String playerName = player.getDisplayName();
+                        if (player == null) {
+                            JSObject ret = new JSObject();
+                            ret.put("player_id", null);
+                            ret.put("player_name", null);
+                            call.resolve(ret);
+                        } else {
+                            String playerId = player.getPlayerId();
+                            String playerName = player.getDisplayName();
 
-                        JSObject ret = new JSObject();
-                        ret.put("player_id", playerId);
-                        ret.put("player_name", playerName);
-                        call.resolve(ret);
+                            JSObject ret = new JSObject();
+                            ret.put("player_id", playerId);
+                            ret.put("player_name", playerName);
+                            call.resolve(ret);
+                        }
                     }
 
                     @Override
                     public void error(String message) {
+                        call.reject(message);
+                    }
+                });
+            }
+
+            @Override
+            public void error(String message) {
+                call.reject(message);
+            }
+        });
+    }
+
+    @PluginMethod
+    public void isAuthenticated(PluginCall call) {
+        implementation.isAuthenticated(call, new AuthenticatedCallback() {
+            @Override
+            public void success(boolean isAuthenticated) {
+
+                if (!isAuthenticated) {
+                    JSObject ret = new JSObject();
+                    ret.put("player_id", null);
+                    ret.put("player_name", null);
+                    call.resolve(ret);
+                }
+
+                implementation.fetchUserInformation(new PlayerResultCallback() {
+                    @Override
+                    public void success(Player player) {
+                        if (player == null) {
+                            JSObject ret = new JSObject();
+                            ret.put("player_id", null);
+                            ret.put("player_name", null);
+                            call.resolve(ret);
+                        } else {
+
+                            String playerId = player.getPlayerId();
+                            String playerName = player.getDisplayName();
+
+                            JSObject ret = new JSObject();
+                            ret.put("player_id", playerId);
+                            ret.put("player_name", playerName);
+                            call.resolve(ret);
+                        }
+                    }
+
+                    @Override
+                    public void error(String message) {
+                        Log.i("CapacitorGameConnect", "fetchUserInformation error: " + message);
                         call.reject(message);
                     }
                 });

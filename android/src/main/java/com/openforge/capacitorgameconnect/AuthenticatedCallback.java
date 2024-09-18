@@ -1,6 +1,6 @@
 package com.openforge.capacitorgameconnect;
 
-public interface SignInCallback {
+public interface AuthenticatedCallback {
     void success(boolean isAuthenticated);
     void error(String message);
 }

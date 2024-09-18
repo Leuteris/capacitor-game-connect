@@ -18,6 +18,10 @@ export class CapacitorGameConnectWeb
     return Promise.resolve({} as User);
   }
 
+  async isAuthenticated(): Promise<User> {
+    return Promise.resolve({} as User);
+  }
+
   /**
    * Method to display the Leaderboards view from Google Play Services SDK
    *

@@ -12,6 +12,12 @@ export interface CapacitorGameConnectPlugin {
     player_id: string;
   }>;
 
+  isAuthenticated(): Promise<{
+    player_name: string;
+    player_id: string;
+  }>;
+
+
   /**
    * * Method to display the Leaderboards
    *

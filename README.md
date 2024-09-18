@@ -145,6 +145,7 @@ Before use the `Achievement Methods` of the plugin, you need to setup your Achie
 <docgen-index>
 
 * [`signIn()`](#signin)
+* [`isAuthenticated()`](#isauthenticated)
 * [`showLeaderboard(...)`](#showleaderboard)
 * [`saveGame(...)`](#savegame)
 * [`loadGame(...)`](#loadgame)
@@ -167,6 +168,17 @@ signIn() => Promise<{ player_name: string; player_id: string; }>
 ```
 
 * Method to sign-in a user
+
+**Returns:** <code>Promise&lt;{ player_name: string; player_id: string; }&gt;</code>
+
+--------------------
+
+
+### isAuthenticated()
+
+```typescript
+isAuthenticated() => Promise<{ player_name: string; player_id: string; }>
+```
 
 **Returns:** <code>Promise&lt;{ player_name: string; player_id: string; }&gt;</code>
 
