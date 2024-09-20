@@ -146,6 +146,7 @@ Before use the `Achievement Methods` of the plugin, you need to setup your Achie
 
 * [`signIn()`](#signin)
 * [`isAuthenticated()`](#isauthenticated)
+* [`calculateRating(...)`](#calculaterating)
 * [`showLeaderboard(...)`](#showleaderboard)
 * [`saveGame(...)`](#savegame)
 * [`loadGame(...)`](#loadgame)
@@ -181,6 +182,21 @@ isAuthenticated() => Promise<{ player_name: string; player_id: string; }>
 ```
 
 **Returns:** <code>Promise&lt;{ player_name: string; player_id: string; }&gt;</code>
+
+--------------------
+
+
+### calculateRating(...)
+
+```typescript
+calculateRating(options: { puzzleSolved: boolean; puzzleRating: number; puzzleRatingDeviation: number; playerRating: number; playerRatingDeviation: number; }) => Promise<Rating>
+```
+
+| Param         | Type                                                                                                                                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`options`** | <code>{ puzzleSolved: boolean; puzzleRating: number; puzzleRatingDeviation: number; playerRating: number; playerRatingDeviation: number; }</code> |
+
+**Returns:** <code>Promise&lt;<a href="#rating">Rating</a>&gt;</code>
 
 --------------------
 
@@ -302,6 +318,14 @@ getUserTotalScore(options: { leaderboardID: string; }) => Promise<PlayerScore>
 
 
 ### Interfaces
+
+
+#### Rating
+
+| Prop                  | Type                |
+| --------------------- | ------------------- |
+| **`rating`**          | <code>number</code> |
+| **`ratingDeviation`** | <code>number</code> |
 
 
 #### SnapshotData

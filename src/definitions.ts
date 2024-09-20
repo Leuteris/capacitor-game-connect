@@ -1,5 +1,6 @@
 import type { PlayerScore } from './interfaces/player-score.interface';
 import { SnapshotData } from './interfaces/snapshot-data.interface';
+import { Rating } from './interfaces/rating.interface';
 
 export interface CapacitorGameConnectPlugin {
   /**
@@ -17,6 +18,8 @@ export interface CapacitorGameConnectPlugin {
     player_id: string;
   }>;
 
+
+  calculateRating(options: { puzzleSolved: boolean, puzzleRating: number,  puzzleRatingDeviation: number,  playerRating: number,  playerRatingDeviation: number }): Promise<Rating>;
 
   /**
    * * Method to display the Leaderboards

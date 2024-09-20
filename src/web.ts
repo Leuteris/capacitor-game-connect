@@ -4,6 +4,7 @@ import type { CapacitorGameConnectPlugin } from './definitions';
 import type { PlayerScore } from './interfaces/player-score.interface';
 import type { User } from './interfaces/user.interface';
 import { SnapshotData } from './interfaces/snapshot-data.interface';
+import { Rating } from './interfaces/rating.interface';
 
 export class CapacitorGameConnectWeb
   extends WebPlugin
@@ -20,6 +21,11 @@ export class CapacitorGameConnectWeb
 
   async isAuthenticated(): Promise<User> {
     return Promise.resolve({} as User);
+  }
+
+  async calculateRating(options: { puzzleSolved: boolean, puzzleRating: number,  puzzleRatingDeviation: number,  playerRating: number,  playerRatingDeviation: number }): Promise<Rating> {
+    console.info('calculateRating function has been called', options);
+    return Promise.resolve({} as Rating);
   }
 
   /**

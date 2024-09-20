@@ -177,4 +177,10 @@ public class CapacitorGameConnectPlugin extends Plugin {
     public void getUserTotalScore(PluginCall call) {
         implementation.getUserTotalScore(call);
     }
+
+    @PluginMethod
+    public void calculateRating(PluginCall call) {
+        implementation.calculateRating(call);
+    }
+
 }

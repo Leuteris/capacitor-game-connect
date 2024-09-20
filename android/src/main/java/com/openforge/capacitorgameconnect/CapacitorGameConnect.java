@@ -24,12 +24,25 @@ import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import  com.google.android.gms.games.snapshot.Snapshot;
+import com.openforge.capacitorgameconnect.glicko2.Rating;
+import com.openforge.capacitorgameconnect.glicko2.RatingCalculator;
+import com.openforge.capacitorgameconnect.glicko2.RatingPeriodResults;
+
 import java.io.IOException;
 
 public class CapacitorGameConnect {
 
     private AppCompatActivity activity;
     private static final String TAG = "CapacitorGameConnect";
+
+    private double TAU = 0.75d;
+    private double defaultVolatility = 0.09d;
+    // rating that can be lost or gained with a single game
+    private int maxRatingDelta = 700;
+    private int minRating = 400;
+    private int maxRating = 4000;
+
+    private RatingCalculator ratingCalculator = new RatingCalculator(defaultVolatility, TAU);
 
     public CapacitorGameConnect(AppCompatActivity activity) {
         this.activity = activity;
@@ -286,6 +299,51 @@ public class CapacitorGameConnect {
                     }
                 }
             );
+    }
+
+    public void calculateRating(PluginCall call) {
+        try {
+            Log.i(TAG, "calculateRating has been called");
+            var currentPuzzleRating =  call.getDouble("puzzleRating");
+            var puzzleRatingDeviation =  call.getDouble("puzzleRatingDeviation");
+            var currentPlayerRating =  call.getDouble("playerRating");
+            var playerRatingDeviation =  call.getDouble("playerRatingDeviation");
+            var puzzleSolved =  call.getBoolean("puzzleSolved");
+
+            currentPuzzleRating = Math.max(currentPuzzleRating, minRating);
+            Rating puzzleRating = new Rating(currentPuzzleRating, puzzleRatingDeviation, defaultVolatility, 0);
+            Rating playerRating = new Rating(currentPlayerRating, playerRatingDeviation, defaultVolatility, 0);
+
+            RatingPeriodResults results = new RatingPeriodResults();
+             if (puzzleSolved) {
+                 results.addResult(playerRating, puzzleRating);
+             } else {
+                 results.addResult(puzzleRating, playerRating);
+             }
+
+            ratingCalculator.updateRatings(results);
+            playerRating.setRating(Math.max(currentPlayerRating - maxRatingDelta, Math.min(playerRating.getRating(), currentPlayerRating + maxRatingDelta)));
+
+            if (playerRating.getRating() < minRating) {
+                playerRating.setRating(minRating);
+            }
+
+            if (playerRating.getRating() > maxRating) {
+                playerRating.setRating(maxRating);
+            }
+
+            Log.i(TAG, "rating: " + playerRating.getRating());
+            Log.i(TAG, "ratingDeviation: " + playerRating.getRatingDeviation());
+
+            JSObject result = new JSObject();
+            result.put("rating", playerRating.getRating());
+            result.put("ratingDeviation", playerRating.getRatingDeviation());
+            call.resolve(result);
+        } catch (Exception e) {
+            Log.i(TAG, "Error calculate rating: "+ e.getMessage());
+
+            call.reject("Error calculate rating: " + e.getMessage());
+        }
     }
 
     private void onCompleteIsAuthenticated(SignInCallback resultCallback, Task<AuthenticationResult> isAuthenticatedTask, GamesSignInClient gamesSignInClient) {
