@@ -67,4 +67,14 @@ export interface CapacitorGameConnectPlugin {
    * @param options { leaderboardID: string }
    */
   getUserTotalScore(options: { leaderboardID: string }): Promise<PlayerScore>;
+
+  /**
+   * Retrieve google play services availability status
+   */
+  isGooglePlayServicesAvailable(): Promise<{ available: boolean }>;
+  /**
+   * Retrieve enabling google play services available request result
+   */
+  makeGooglePlayServicesAvailable(): Promise<{ enabled: boolean }>;
+
 }

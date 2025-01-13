@@ -155,6 +155,8 @@ Before use the `Achievement Methods` of the plugin, you need to setup your Achie
 * [`unlockAchievement(...)`](#unlockachievement)
 * [`incrementAchievementProgress(...)`](#incrementachievementprogress)
 * [`getUserTotalScore(...)`](#getusertotalscore)
+* [`isGooglePlayServicesAvailable()`](#isgoogleplayservicesavailable)
+* [`makeGooglePlayServicesAvailable()`](#makegoogleplayservicesavailable)
 * [Interfaces](#interfaces)
 
 </docgen-index>
@@ -313,6 +315,32 @@ getUserTotalScore(options: { leaderboardID: string; }) => Promise<PlayerScore>
 | **`options`** | <code>{ leaderboardID: string; }</code> | : string }  |
 
 **Returns:** <code>Promise&lt;<a href="#playerscore">PlayerScore</a>&gt;</code>
+
+--------------------
+
+
+### isGooglePlayServicesAvailable()
+
+```typescript
+isGooglePlayServicesAvailable() => Promise<{ available: boolean; }>
+```
+
+Retrieve google play services availability status
+
+**Returns:** <code>Promise&lt;{ available: boolean; }&gt;</code>
+
+--------------------
+
+
+### makeGooglePlayServicesAvailable()
+
+```typescript
+makeGooglePlayServicesAvailable() => Promise<{ enabled: boolean; }>
+```
+
+Retrieve enabling google play services available request result
+
+**Returns:** <code>Promise&lt;{ enabled: boolean; }&gt;</code>
 
 --------------------
 

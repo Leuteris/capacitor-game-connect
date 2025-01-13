@@ -5,6 +5,10 @@ import type { PlayerScore } from './interfaces/player-score.interface';
 import type { User } from './interfaces/user.interface';
 import { SnapshotData } from './interfaces/snapshot-data.interface';
 import { Rating } from './interfaces/rating.interface';
+import {
+  IsGooglePlayPlayAvailableResponse,
+  MakeGooglePlayPlayAvailabilityResponse,
+} from './interfaces/play-Availability';
 
 export class CapacitorGameConnectWeb
   extends WebPlugin
@@ -108,4 +112,16 @@ export class CapacitorGameConnectWeb
     console.info('getUserTotalScore function has been called', options);
     return Promise.resolve({} as PlayerScore);
   }
+
+  async isGooglePlayServicesAvailable(): Promise<IsGooglePlayPlayAvailableResponse> {
+    console.info('isGooglePlayServicesAvailable function has been called');
+    return Promise.resolve({} as IsGooglePlayPlayAvailableResponse);
+  }
+
+
+  async makeGooglePlayServicesAvailable(): Promise<MakeGooglePlayPlayAvailabilityResponse> {
+    console.info('makeGooglePlayServicesAvailable function has been called');
+    return Promise.resolve({} as MakeGooglePlayPlayAvailabilityResponse);
+  }
+
 }

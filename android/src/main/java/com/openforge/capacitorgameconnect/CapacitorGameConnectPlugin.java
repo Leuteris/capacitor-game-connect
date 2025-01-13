@@ -21,6 +21,7 @@ public class CapacitorGameConnectPlugin extends Plugin {
 
     private CapacitorGameConnect implementation;
     private ActivityResultLauncher<Intent> startActivityIntent;
+    private GooglePlayAvailability googlePlayAvailabilityImplementation;
 
     @Override
     public void load() {
@@ -37,6 +38,7 @@ public class CapacitorGameConnectPlugin extends Plugin {
                                 }
                         );
         implementation = new CapacitorGameConnect(getActivity());
+        this.googlePlayAvailabilityImplementation = new GooglePlayAvailability(getActivity());
     }
 
     @PluginMethod
@@ -181,6 +183,37 @@ public class CapacitorGameConnectPlugin extends Plugin {
     @PluginMethod
     public void calculateRating(PluginCall call) {
         implementation.calculateRating(call);
+    }
+
+    @PluginMethod()
+    public void isGooglePlayServicesAvailable(PluginCall call) {
+        try {
+            boolean isAvailable = googlePlayAvailabilityImplementation.isGooglePlayServicesAvailable();
+            JSObject data = new JSObject();
+            data.put("available", isAvailable);
+            call.resolve(data);
+        } catch (Exception exception) {
+            call.reject(exception.getLocalizedMessage());
+        }
+    }
+
+    @PluginMethod()
+    public void makeGooglePlayServicesAvailable(PluginCall call) {
+        googlePlayAvailabilityImplementation.makeGooglePlayServicesAvailable(new GetMakeGooglePlayAvailableResultCallback() {
+            @Override
+            public void success(boolean enabled) {
+                JSObject data = new JSObject();
+                data.put("enabled", true);
+                call.resolve(data);
+            }
+
+            @Override
+            public void failed(boolean enabled, String message) {
+                JSObject data = new JSObject();
+                data.put("enabled", false);
+                call.resolve(data);
+            }
+        });
     }
 
 }
