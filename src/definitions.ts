@@ -11,11 +11,13 @@ export interface CapacitorGameConnectPlugin {
   signIn(): Promise<{
     player_name: string;
     player_id: string;
+    player_image: string;
   }>;
 
   isAuthenticated(): Promise<{
     player_name: string;
     player_id: string;
+    player_image: string;
   }>;
 
 

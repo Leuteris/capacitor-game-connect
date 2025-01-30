@@ -1,6 +1,11 @@
 package com.openforge.capacitorgameconnect;
 
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
+import android.net.Uri;
+import android.util.Base64;
 import android.util.Log;
 
 import androidx.activity.result.ActivityResult;
@@ -13,8 +18,13 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.google.android.gms.common.images.ImageManager;
 import com.google.android.gms.games.PlayGamesSdk;
 import com.google.android.gms.games.Player;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 
 @CapacitorPlugin(name = "CapacitorGameConnect")
 public class CapacitorGameConnectPlugin extends Plugin {
@@ -58,15 +68,10 @@ public class CapacitorGameConnectPlugin extends Plugin {
                             JSObject ret = new JSObject();
                             ret.put("player_id", null);
                             ret.put("player_name", null);
+                            ret.put("player_image", null);
                             call.resolve(ret);
                         } else {
-                            String playerId = player.getPlayerId();
-                            String playerName = player.getDisplayName();
-
-                            JSObject ret = new JSObject();
-                            ret.put("player_id", playerId);
-                            ret.put("player_name", playerName);
-                            call.resolve(ret);
+                            resolvePlayerData(player, call);
                         }
                     }
 
@@ -104,16 +109,12 @@ public class CapacitorGameConnectPlugin extends Plugin {
                             JSObject ret = new JSObject();
                             ret.put("player_id", null);
                             ret.put("player_name", null);
+                            ret.put("player_image", null);
                             call.resolve(ret);
                         } else {
 
-                            String playerId = player.getPlayerId();
-                            String playerName = player.getDisplayName();
+                            resolvePlayerData(player, call);
 
-                            JSObject ret = new JSObject();
-                            ret.put("player_id", playerId);
-                            ret.put("player_name", playerName);
-                            call.resolve(ret);
                         }
                     }
 
@@ -130,6 +131,51 @@ public class CapacitorGameConnectPlugin extends Plugin {
                 call.reject(message);
             }
         });
+    }
+
+    private void resolvePlayerData(Player player, PluginCall call) {
+        String playerId = player.getPlayerId();
+        String playerName = player.getDisplayName();
+        Uri imageUri = player.getHiResImageUri();
+        if (imageUri == null) {
+            imageUri = player.getIconImageUri();
+        }
+
+        if (imageUri != null) {
+            ImageManager imageManager = ImageManager.create(getContext());
+            imageManager.loadImage(new ImageManager.OnImageLoadedListener() {
+                @Override
+                public void onImageLoaded(Uri uri, Drawable drawable, boolean isImmediate) {
+                    if (drawable instanceof BitmapDrawable) {
+                        Bitmap bitmap = ((BitmapDrawable) drawable).getBitmap();
+
+                        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
+                        byte[] byteArray = outputStream.toByteArray();
+                        String base64String = Base64.encodeToString(byteArray, Base64.DEFAULT);
+
+                        JSObject ret = new JSObject();
+                        ret.put("player_id", playerId);
+                        ret.put("player_name", playerName);
+                        ret.put("player_image", base64String);
+                        call.resolve(ret);
+                    } else {
+                        JSObject ret = new JSObject();
+                        ret.put("player_id", playerId);
+                        ret.put("player_name", playerName);
+                        ret.put("player_image", null);
+                        call.resolve(ret);
+                    }
+                    //TODO timeout?
+                }
+            }, imageUri);
+        } else {
+            JSObject ret = new JSObject();
+            ret.put("player_id", playerId);
+            ret.put("player_name", playerName);
+            ret.put("player_image", null);
+            call.resolve(ret);
+        }
     }
 
     @PluginMethod
