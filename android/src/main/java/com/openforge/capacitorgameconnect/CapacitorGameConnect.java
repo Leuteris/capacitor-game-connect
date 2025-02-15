@@ -174,7 +174,8 @@ public class CapacitorGameConnect {
                 case CommonStatusCodes.SIGN_IN_REQUIRED:
                     // Sign-in required, but allow the user to skip it
                     Log.i(TAG, "Sign-in required but skipped. Proceeding without Play Games features.");
-                    resultCallback.success(null); // Indicate sign-in is skipped
+                    resultCallback.error("Sign-in failed with status code: " + statusCode);
+
                     break;
 
                 default:
@@ -353,6 +354,7 @@ public class CapacitorGameConnect {
             Log.i(TAG, "User is authenticated");
             resultCallback.success(true);
         } else {
+            Log.i(TAG, "User is not authenticated");
             signIn(resultCallback, gamesSignInClient);
         }
     }

@@ -29,6 +29,8 @@ import java.io.InputStream;
 @CapacitorPlugin(name = "CapacitorGameConnect")
 public class CapacitorGameConnectPlugin extends Plugin {
 
+    private static final String TAG = "CapacitorGameConnectPlg";
+
     private CapacitorGameConnect implementation;
     private ActivityResultLauncher<Intent> startActivityIntent;
 
@@ -51,86 +53,93 @@ public class CapacitorGameConnectPlugin extends Plugin {
 
     @PluginMethod
     public void signIn(PluginCall call) {
-        implementation.signIn(call, new SignInCallback() {
-            @Override
-            public void success(boolean isAuthenticated) {
-                if (!isAuthenticated) {
-                    JSObject ret = new JSObject();
-                    ret.put("player_id", null);
-                    ret.put("player_name", null);
-                    call.resolve(ret);
+        try {
+            implementation.signIn(call, new SignInCallback() {
+                @Override
+                public void success(boolean isAuthenticated) {
+                    if (!isAuthenticated) {
+                        Log.e("CapacitorGameConnect",
+                                "fetchUserInformation inside signIn, isAuthenticated false");
+                        call.reject("fetchUserInformation inside signIn, isAuthenticated false");
+                    }
+
+                    implementation.fetchUserInformation(new PlayerResultCallback() {
+                        @Override
+                        public void success(Player player) {
+                            if (player == null) {
+                                Log.e("CapacitorGameConnect",
+                                        "fetchUserInformation inside signIn, null player");
+                                call.reject("fetchUserInformation inside signIn, null player");
+                            } else {
+                                resolvePlayerData(player, call);
+                            }
+                        }
+
+                        @Override
+                        public void error(String message) {
+                            Log.e("CapacitorGameConnect", "fetchUserInformation inside signIn failed: " + message);
+                            call.reject("fetchUserInformation inside signIn failed: " + message);
+                        }
+                    });
                 }
 
-                implementation.fetchUserInformation(new PlayerResultCallback() {
-                    @Override
-                    public void success(Player player) {
-                        if (player == null) {
-                            JSObject ret = new JSObject();
-                            ret.put("player_id", null);
-                            ret.put("player_name", null);
-                            ret.put("player_image", null);
-                            call.resolve(ret);
-                        } else {
-                            resolvePlayerData(player, call);
-                        }
-                    }
-
-                    @Override
-                    public void error(String message) {
-                        call.reject(message);
-                    }
-                });
-            }
-
-            @Override
-            public void error(String message) {
-                call.reject(message);
-            }
-        });
+                @Override
+                public void error(String message) {
+                    call.reject(message);
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Failed signIn", e);
+            call.reject("Failed signIn: " + e.getMessage());
+        }
     }
 
     @PluginMethod
     public void isAuthenticated(PluginCall call) {
-        implementation.isAuthenticated(call, new AuthenticatedCallback() {
-            @Override
-            public void success(boolean isAuthenticated) {
+        try {
+            implementation.isAuthenticated(call, new AuthenticatedCallback() {
+                @Override
+                public void success(boolean isAuthenticated) {
 
-                if (!isAuthenticated) {
-                    JSObject ret = new JSObject();
-                    ret.put("player_id", null);
-                    ret.put("player_name", null);
-                    call.resolve(ret);
+                    if (!isAuthenticated) { // user is not sign-in, default account will be used
+                        JSObject ret = new JSObject();
+                        ret.put("player_id", null);
+                        ret.put("player_name", null);
+                        call.resolve(ret);
+                    }
+
+                    implementation.fetchUserInformation(new PlayerResultCallback() {
+                        @Override
+                        public void success(Player player) {
+                            if (player == null) {
+                                Log.e("CapacitorGameConnect",
+                                        "fetchUserInformation inside isAuthenticated, null player");
+                                call.reject("fetchUserInformation inside isAuthenticated, null player");
+                            } else {
+                                resolvePlayerData(player, call);
+                            }
+                        }
+
+                        @Override
+                        public void error(String message) {
+                            Log.e("CapacitorGameConnect",
+                                    "fetchUserInformation inside isAuthenticated failed: " + message);
+                            call.reject("fetchUserInformation inside isAuthenticated failed: " + message);
+                        }
+                    });
                 }
 
-                implementation.fetchUserInformation(new PlayerResultCallback() {
-                    @Override
-                    public void success(Player player) {
-                        if (player == null) {
-                            JSObject ret = new JSObject();
-                            ret.put("player_id", null);
-                            ret.put("player_name", null);
-                            ret.put("player_image", null);
-                            call.resolve(ret);
-                        } else {
-
-                            resolvePlayerData(player, call);
-
-                        }
-                    }
-
-                    @Override
-                    public void error(String message) {
-                        Log.i("CapacitorGameConnect", "fetchUserInformation error: " + message);
-                        call.reject(message);
-                    }
-                });
-            }
-
-            @Override
-            public void error(String message) {
-                call.reject(message);
-            }
-        });
+                @Override
+                public void error(String message) {
+                    Log.e("CapacitorGameConnect",
+                            "isAuthenticated failed: " + message);
+                    call.reject("isAuthenticated failed: " + message);
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Failed isAuthenticated", e);
+            call.reject("Failed isAuthenticated: " + e.getMessage());
+        }
     }
 
     private void resolvePlayerData(Player player, PluginCall call) {
@@ -166,7 +175,6 @@ public class CapacitorGameConnectPlugin extends Plugin {
                         ret.put("player_image", null);
                         call.resolve(ret);
                     }
-                    //TODO timeout?
                 }
             }, imageUri);
         } else {
@@ -180,25 +188,45 @@ public class CapacitorGameConnectPlugin extends Plugin {
 
     @PluginMethod
     public void showLeaderboard(PluginCall call) {
-        implementation.showLeaderboard(call, this.startActivityIntent);
-        call.resolve();
+        try {
+            implementation.showLeaderboard(call, this.startActivityIntent);
+            call.resolve();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed showLeaderboard", e);
+            call.reject("Failed showLeaderboard: " + e.getMessage());
+        }
     }
 
     @PluginMethod
     public void saveGame(PluginCall call) {
-        implementation.saveGame(call);
-        call.resolve();
+        try {
+            implementation.saveGame(call);
+            call.resolve();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed saveGame", e);
+            call.reject("Failed saveGame: " + e.getMessage());
+        }
     }
 
     @PluginMethod
     public void loadGame(PluginCall call) {
-        implementation.loadGame(call);
+        try {
+            implementation.loadGame(call);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed loadGame", e);
+            call.reject("Failed loadGame: " + e.getMessage());
+        }
     }
 
     @PluginMethod
     public void submitScore(PluginCall call) {
-        implementation.submitScore(call);
-        call.resolve();
+        try {
+            implementation.submitScore(call);
+            call.resolve();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed submitScore", e);
+            call.reject("Failed submitScore: " + e.getMessage());
+        }
     }
 
     @PluginMethod
@@ -226,7 +254,12 @@ public class CapacitorGameConnectPlugin extends Plugin {
 
     @PluginMethod
     public void calculateRating(PluginCall call) {
-        implementation.calculateRating(call);
+        try {
+            implementation.calculateRating(call);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed calculateRating", e);
+            call.reject("Failed calculateRating: " + e.getMessage());
+        }
     }
 
 }
