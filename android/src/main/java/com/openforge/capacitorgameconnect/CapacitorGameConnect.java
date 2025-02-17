@@ -100,19 +100,27 @@ public class CapacitorGameConnect {
 
     snapshotsClient.open(snapshotId, true, conflictResolutionPolicy)
         .addOnCompleteListener(task -> {
-          Snapshot snapshot = task.getResult().getData();
+          try {
+              Snapshot snapshot = task.getResult().getData();
 
-          if (snapshot != null) {
-            //call of the method writeSnapshot params : the snapshot and the data we
-            //want to save with a description
-            writeSnapshot(snapshot, byteArray, "description")
-                .addOnCompleteListener(t -> {
-                  if (t.isSuccessful()) {
-                    Log.i(TAG, "saveGame completed successful");
-                  } else {
-                    Log.e("ERR", "saveGame failed " + t.getException());
-                  }
-                });
+              if (snapshot != null) {
+                  //call of the method writeSnapshot params : the snapshot and the data we
+                  //want to save with a description
+                  writeSnapshot(snapshot, byteArray, "description")
+                          .addOnCompleteListener(t -> {
+                              if (t.isSuccessful()) {
+                                  Log.i(TAG, "saveGame completed successful");
+                              } else {
+                                  Log.e("ERR", "saveGame failed " + t.getException());
+                              }
+                          }).addOnFailureListener(e -> {
+                              Log.e(TAG, "Failed saveGame, writeSnapshot", e);
+                              call.reject("Failed saveGame, writeSnapshot: " + e.getMessage());
+                          });
+              }
+          } catch (Exception e) {
+              Log.e(TAG, "Failed saveGame", e);
+              call.reject("Failed saveGame: " + e.getMessage());
           }
         });
   }
@@ -121,7 +129,7 @@ public class CapacitorGameConnect {
     Log.i(TAG, "load game called");
 
     String snapshotId = call.getString("snapshotID");
-    loadSnapshot(snapshotId)
+    loadSnapshot(call, snapshotId)
         .addOnSuccessListener(data -> {
           Log.i(TAG, "load game completed successfully: " + new String(data));
           JSObject result = new JSObject();
@@ -132,7 +140,7 @@ public class CapacitorGameConnect {
             new OnFailureListener() {
               @Override
               public void onFailure(@NonNull Exception e) {
-                Log.e("ERR", "saveGame failed " + e.getMessage());
+                Log.e("ERR", "loadGame failed " + e.getMessage());
                 call.reject("Error loading game" + e.getMessage());
               }
             }
@@ -421,7 +429,7 @@ public class CapacitorGameConnect {
     return snapshotsClient.commitAndClose(snapshot, metadataChange);
   }
 
-  private Task<byte[]> loadSnapshot(String snapshotID) {
+  private Task<byte[]> loadSnapshot(PluginCall call, String snapshotID) {
     SnapshotsClient snapshotsClient =
         PlayGames.getSnapshotsClient(this.activity);
 
@@ -438,17 +446,22 @@ public class CapacitorGameConnect {
         }).continueWith(new Continuation<DataOrConflict<Snapshot>, byte[]>() {
           @Override
           public byte[] then(@NonNull Task<SnapshotsClient.DataOrConflict<Snapshot>> task) throws Exception {
-            Snapshot snapshot = task.getResult().getData();
+              try {
 
-            // Opening the snapshot was a success and any conflicts have been resolved.
-            try {
-              // Extract the raw data from the snapshot.
-              return snapshot.getSnapshotContents().readFully();
-            } catch (IOException e) {
-              Log.e(TAG, "Error while reading Snapshot.", e);
-            }
+                  Snapshot snapshot = task.getResult().getData();
 
-            return null;
+                  // Opening the snapshot was a success and any conflicts have been resolved.
+                  try {
+                      // Extract the raw data from the snapshot.
+                      return snapshot.getSnapshotContents().readFully();
+                  } catch (IOException e) {
+                      Log.e(TAG, "Error while reading Snapshot.", e);
+                  }
+              } catch (Exception e) {
+                  Log.e(TAG, "Failed loadSnapshot", e);
+                  call.reject("Failed loadSnapshot: " + e.getMessage());
+              }
+              return null;
           }
         });
   }
