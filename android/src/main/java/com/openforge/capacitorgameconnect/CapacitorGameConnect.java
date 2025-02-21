@@ -1,6 +1,8 @@
 package com.openforge.capacitorgameconnect;
 
 import android.content.Intent;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.annotation.NonNull;
@@ -10,7 +12,6 @@ import com.getcapacitor.PluginCall;
 import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.common.api.CommonStatusCodes;
 import com.google.android.gms.games.AnnotatedData;
-import com.google.android.gms.games.AuthenticationResult;
 import com.google.android.gms.games.GamesSignInClient;
 import com.google.android.gms.games.PlayGames;
 import com.google.android.gms.games.SnapshotsClient;
@@ -29,11 +30,14 @@ import com.openforge.capacitorgameconnect.glicko2.RatingCalculator;
 import com.openforge.capacitorgameconnect.glicko2.RatingPeriodResults;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 public class CapacitorGameConnect {
 
     private AppCompatActivity activity;
     private static final String TAG = "CapacitorGameConnect";
+
+    private static final long REQUEST_TIMEOUT_MS = 8000;
 
     private double TAU = 0.75d;
     private double defaultVolatility = 0.09d;
@@ -58,12 +62,7 @@ public class CapacitorGameConnect {
         Log.i(TAG, "SignIn method called");
         GamesSignInClient gamesSignInClient = PlayGames.getGamesSignInClient(this.activity);
 
-        gamesSignInClient
-                .isAuthenticated()
-                .addOnCompleteListener(
-                        isAuthenticatedTask -> onCompleteIsAuthenticated(resultCallback, isAuthenticatedTask, gamesSignInClient)
-                )
-                .addOnFailureListener(e -> resultCallback.error(e.getMessage()));
+        signIn(resultCallback, gamesSignInClient);
     }
 
     public void isAuthenticated(PluginCall call, final AuthenticatedCallback resultCallback) {
@@ -93,40 +92,54 @@ public class CapacitorGameConnect {
     String data = call.getString("data");
     String snapshotId = call.getString("snapshotID");
 
-    byte[] byteArray = data.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    byte[] byteArray = data.getBytes(StandardCharsets.UTF_8);
 
     SnapshotsClient snapshotsClient = PlayGames.getSnapshotsClient(this.activity);
     int conflictResolutionPolicy = SnapshotsClient.RESOLUTION_POLICY_MOST_RECENTLY_MODIFIED;
 
     snapshotsClient.open(snapshotId, true, conflictResolutionPolicy)
         .addOnCompleteListener(task -> {
-          try {
-              Snapshot snapshot = task.getResult().getData();
+            if (task.isSuccessful()) {
+                Snapshot snapshot = null;
+                try {
+                    snapshot = task.getResult().getData();
 
-              if (snapshot != null) {
-                  //call of the method writeSnapshot params : the snapshot and the data we
-                  //want to save with a description
-                  writeSnapshot(snapshot, byteArray, "description")
-                          .addOnCompleteListener(t -> {
-                              if (t.isSuccessful()) {
-                                  Log.i(TAG, "saveGame completed successful");
-                              } else {
-                                  Log.e("ERR", "saveGame failed " + t.getException());
-                              }
-                          }).addOnFailureListener(e -> {
-                              Log.e(TAG, "Failed saveGame, writeSnapshot", e);
-                              call.reject("Failed saveGame, writeSnapshot: " + e.getMessage());
-                          });
-              }
-          } catch (Exception e) {
-              Log.e(TAG, "Failed saveGame", e);
-              call.reject("Failed saveGame: " + e.getMessage());
-          }
+                    if (snapshot != null) {
+
+                        //call of the method writeSnapshot params : the snapshot and the data we
+                        //want to save with a description
+                        Snapshot finalSnapshot = snapshot;
+                        writeSnapshot(snapshot, byteArray, "description")
+                                .addOnCompleteListener(t -> {
+                                    if (t.isSuccessful()) {
+                                        Log.i(TAG, "saveGame completed successful");
+                                    } else {
+                                        Log.e("ERR", "saveGame failed " + t.getException());
+                                    }
+                                }).addOnFailureListener(e -> {
+                                    snapshotsClient.discardAndClose(finalSnapshot);
+                                    Log.e(TAG, "Failed saveGame, writeSnapshot", e);
+                                    call.reject("Failed saveGame, writeSnapshot: " + e.getMessage());
+                                });
+                    }
+                } catch (Exception e) {
+                    if (snapshot !=null) {
+                        snapshotsClient.discardAndClose(snapshot);
+                    }
+                    Log.e(TAG, "Failed saveGame", e);
+                    call.reject("Failed saveGame: " + e.getMessage());
+                }
+            } else {
+                Log.e(TAG, "Failed saveGame task");
+                call.reject("Failed saveGame task");
+            }
         });
   }
 
   public void loadGame(PluginCall call) {
     Log.i(TAG, "load game called");
+
+    // call.reject("loadGame custom error");
 
     String snapshotId = call.getString("snapshotID");
     loadSnapshot(call, snapshotId)
@@ -140,8 +153,8 @@ public class CapacitorGameConnect {
             new OnFailureListener() {
               @Override
               public void onFailure(@NonNull Exception e) {
-                Log.e("ERR", "loadGame failed " + e.getMessage());
-                call.reject("Error loading game" + e.getMessage());
+                Log.e("ERR", "loadGame failed: " + e.getMessage());
+                call.reject("Error loading game: " + e.getMessage());
               }
             }
         );
@@ -153,15 +166,27 @@ public class CapacitorGameConnect {
      * @param resultCallback as PlayerResultCallback
      */
     public void fetchUserInformation(final PlayerResultCallback resultCallback) {
+       // resultCallback.error("fetchUserInformation custom error");
+        Log.i("CapacitorGameConnect", "fetchUserInformation called");
+        Handler handler = new Handler(Looper.getMainLooper());
+        Runnable timeoutRunnable = () -> {
+            resultCallback.error("fetchUserInformation request timed out");
+        };
+
+        handler.postDelayed(timeoutRunnable, REQUEST_TIMEOUT_MS);
+
         PlayGames
                 .getPlayersClient(this.activity)
                 .getCurrentPlayer()
                 .addOnSuccessListener(
                         player -> {
+                            Log.i("CapacitorGameConnect", "fetchUserInformation success");
+                            handler.removeCallbacks(timeoutRunnable); // Cancel timeout
                             resultCallback.success(player);
                         }
                 )
                 .addOnFailureListener(e -> {
+                    handler.removeCallbacks(timeoutRunnable); // Cancel timeout
                     handleFailure(resultCallback, e);
                 });
     }
@@ -355,9 +380,8 @@ public class CapacitorGameConnect {
         }
     }
 
-    private void onCompleteIsAuthenticated(SignInCallback resultCallback, Task<AuthenticationResult> isAuthenticatedTask, GamesSignInClient gamesSignInClient) {
+/*    private void onCompleteIsAuthenticated(SignInCallback resultCallback, Task<AuthenticationResult> isAuthenticatedTask, GamesSignInClient gamesSignInClient) {
         boolean isAuthenticated = (isAuthenticatedTask.isSuccessful() && isAuthenticatedTask.getResult().isAuthenticated());
-
         if (isAuthenticated) {
             Log.i(TAG, "User is authenticated");
             resultCallback.success(true);
@@ -365,15 +389,17 @@ public class CapacitorGameConnect {
             Log.i(TAG, "User is not authenticated");
             signIn(resultCallback, gamesSignInClient);
         }
-    }
+    }*/
 
     private void signIn(SignInCallback resultCallback, GamesSignInClient gamesSignInClient) {
         gamesSignInClient
                 .signIn()
                 .addOnCompleteListener(
                         data -> {
-                            Log.i(TAG, "Sign-in completed successful");
-                            resultCallback.success(true);
+                            boolean isAuthenticated = (data.isSuccessful() && data.getResult().isAuthenticated());
+
+                            Log.i(TAG, "Sign-in completed successful, isAuthenticated: " + isAuthenticated);
+                            resultCallback.success(isAuthenticated);
                         }
                 )
                 .addOnFailureListener(e -> onSignInFailure(resultCallback, e));
@@ -445,18 +471,24 @@ public class CapacitorGameConnect {
           }
         }).continueWith(new Continuation<DataOrConflict<Snapshot>, byte[]>() {
           @Override
-          public byte[] then(@NonNull Task<SnapshotsClient.DataOrConflict<Snapshot>> task) throws Exception {
+          public byte[] then(@NonNull Task<DataOrConflict<Snapshot>> task) throws Exception {
               try {
 
-                  Snapshot snapshot = task.getResult().getData();
+                  if (task.isSuccessful()) {
+                      Snapshot snapshot = task.getResult().getData();
 
-                  // Opening the snapshot was a success and any conflicts have been resolved.
-                  try {
-                      // Extract the raw data from the snapshot.
-                      return snapshot.getSnapshotContents().readFully();
-                  } catch (IOException e) {
-                      Log.e(TAG, "Error while reading Snapshot.", e);
+                      // Opening the snapshot was a success and any conflicts have been resolved.
+                      try {
+                          // Extract the raw data from the snapshot.
+                          return snapshot.getSnapshotContents().readFully();
+                      } catch (IOException e) {
+                          Log.e(TAG, "Error while reading Snapshot.", e);
+                      }
+                  } else {
+                      Log.e(TAG, "Failed loadSnapshot task");
+                      call.reject("Failed loadSnapshot task: ");
                   }
+
               } catch (Exception e) {
                   Log.e(TAG, "Failed loadSnapshot", e);
                   call.reject("Failed loadSnapshot: " + e.getMessage());

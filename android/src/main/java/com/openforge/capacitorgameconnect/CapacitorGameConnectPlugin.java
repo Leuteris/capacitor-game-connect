@@ -5,6 +5,8 @@ import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Base64;
 import android.util.Log;
 
@@ -23,8 +25,6 @@ import com.google.android.gms.games.PlayGamesSdk;
 import com.google.android.gms.games.Player;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
 
 @CapacitorPlugin(name = "CapacitorGameConnect")
 public class CapacitorGameConnectPlugin extends Plugin {
@@ -49,6 +49,11 @@ public class CapacitorGameConnectPlugin extends Plugin {
                                 }
                         );
         implementation = new CapacitorGameConnect(getActivity());
+
+
+    /*    String android_id = Secure.getString(getContext().getContentResolver(),
+                Secure.ANDROID_ID);
+        Log.i("CapacitorGameConnect", "Device ID: "+ android_id); */
     }
 
     @PluginMethod
@@ -58,9 +63,9 @@ public class CapacitorGameConnectPlugin extends Plugin {
                 @Override
                 public void success(boolean isAuthenticated) {
                     if (!isAuthenticated) {
-                        Log.e("CapacitorGameConnect",
-                                "fetchUserInformation inside signIn, isAuthenticated false");
-                        call.reject("fetchUserInformation inside signIn, isAuthenticated false");
+                        Log.e("CapacitorGameConnect", "signIn, isAuthenticated false");
+                        call.reject("PLAYER_NOT_AUTH");
+                        return;
                     }
 
                     implementation.fetchUserInformation(new PlayerResultCallback() {
@@ -106,6 +111,7 @@ public class CapacitorGameConnectPlugin extends Plugin {
                         ret.put("player_id", null);
                         ret.put("player_name", null);
                         call.resolve(ret);
+                        return;
                     }
 
                     implementation.fetchUserInformation(new PlayerResultCallback() {
@@ -143,6 +149,7 @@ public class CapacitorGameConnectPlugin extends Plugin {
     }
 
     private void resolvePlayerData(Player player, PluginCall call) {
+        Log.i("CapacitorGameConnect", "resolvePlayerData called");
         String playerId = player.getPlayerId();
         String playerName = player.getDisplayName();
         Uri imageUri = player.getHiResImageUri();
@@ -151,29 +158,43 @@ public class CapacitorGameConnectPlugin extends Plugin {
         }
 
         if (imageUri != null) {
+            Handler handler = new Handler(Looper.getMainLooper());
+            Runnable timeoutRunnable = () -> {
+                call.reject("resolvePlayerData onImageLoaded timed out");
+            };
+
+            handler.postDelayed(timeoutRunnable, 8000);
             ImageManager imageManager = ImageManager.create(getContext());
             imageManager.loadImage(new ImageManager.OnImageLoadedListener() {
                 @Override
                 public void onImageLoaded(Uri uri, Drawable drawable, boolean isImmediate) {
-                    if (drawable instanceof BitmapDrawable) {
-                        Bitmap bitmap = ((BitmapDrawable) drawable).getBitmap();
+                    try {
+                        handler.removeCallbacks(timeoutRunnable); // Cancel timeout
+                        Log.i("CapacitorGameConnect", "onImageLoaded called");
+                        if (drawable instanceof BitmapDrawable) {
+                            Bitmap bitmap = ((BitmapDrawable) drawable).getBitmap();
 
-                        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
-                        byte[] byteArray = outputStream.toByteArray();
-                        String base64String = Base64.encodeToString(byteArray, Base64.DEFAULT);
+                            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                            bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
+                            byte[] byteArray = outputStream.toByteArray();
+                            String base64String = Base64.encodeToString(byteArray, Base64.DEFAULT);
 
-                        JSObject ret = new JSObject();
-                        ret.put("player_id", playerId);
-                        ret.put("player_name", playerName);
-                        ret.put("player_image", base64String);
-                        call.resolve(ret);
-                    } else {
-                        JSObject ret = new JSObject();
-                        ret.put("player_id", playerId);
-                        ret.put("player_name", playerName);
-                        ret.put("player_image", null);
-                        call.resolve(ret);
+                            JSObject ret = new JSObject();
+                            ret.put("player_id", playerId);
+                            ret.put("player_name", playerName);
+                            ret.put("player_image", base64String);
+                            call.resolve(ret);
+                        } else {
+                            JSObject ret = new JSObject();
+                            ret.put("player_id", playerId);
+                            ret.put("player_name", playerName);
+                            ret.put("player_image", null);
+                            call.resolve(ret);
+                        }
+                        Log.i("CapacitorGameConnect", "onImageLoaded completed");
+                    } catch (Exception e) {
+                        Log.e(TAG, "Failed onImageLoaded", e);
+                        call.reject("Failed onImageLoaded: " + e.getMessage());
                     }
                 }
             }, imageUri);
@@ -184,6 +205,7 @@ public class CapacitorGameConnectPlugin extends Plugin {
             ret.put("player_image", null);
             call.resolve(ret);
         }
+        Log.i("CapacitorGameConnect", "resolvePlayerData completed");
     }
 
     @PluginMethod
