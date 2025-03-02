@@ -144,10 +144,13 @@ public class CapacitorGameConnect {
     String snapshotId = call.getString("snapshotID");
     loadSnapshot(call, snapshotId)
         .addOnSuccessListener(data -> {
-          Log.i(TAG, "load game completed successfully: " + new String(data));
-          JSObject result = new JSObject();
-          result.put("snapshot_data", new String(data));
-          call.resolve(result);
+            if (data == null) {
+                call.reject("Loading snapshot null");
+            }
+            Log.i(TAG, "load game completed successfully: " + new String(data));
+            JSObject result = new JSObject();
+            result.put("snapshot_data", new String(data));
+            call.resolve(result);
         })
         .addOnFailureListener(
             new OnFailureListener() {
@@ -456,23 +459,32 @@ public class CapacitorGameConnect {
   }
 
   private Task<byte[]> loadSnapshot(PluginCall call, String snapshotID) {
-    SnapshotsClient snapshotsClient =
-        PlayGames.getSnapshotsClient(this.activity);
+    SnapshotsClient snapshotsClient = PlayGames.getSnapshotsClient(this.activity);
 
-    // In the case of a conflict, the most recently modified version of this snapshot will be used.
+      Handler handler = new Handler(Looper.getMainLooper());
+      Runnable timeoutRunnable = () -> {
+          call.reject("loadSnapshot request timed out");
+      };
+
+      handler.postDelayed(timeoutRunnable, REQUEST_TIMEOUT_MS);
+
+      // In the case of a conflict, the most recently modified version of this snapshot will be used.
     int conflictResolutionPolicy = SnapshotsClient.RESOLUTION_POLICY_MOST_RECENTLY_MODIFIED;
 
-    // Open the saved game using its name
+      // Open the saved game using its name
     return snapshotsClient.open(snapshotID, true, conflictResolutionPolicy)
         .addOnFailureListener(new OnFailureListener() {
           @Override
           public void onFailure(@NonNull Exception e) {
             Log.e(TAG, "Error while opening Snapshot.", e);
+            handler.removeCallbacks(timeoutRunnable); // Cancel timeout
+            call.reject("Error while opening Snapshot: " + e.getMessage());
           }
         }).continueWith(new Continuation<DataOrConflict<Snapshot>, byte[]>() {
           @Override
           public byte[] then(@NonNull Task<DataOrConflict<Snapshot>> task) throws Exception {
               try {
+                  handler.removeCallbacks(timeoutRunnable); // Cancel timeout
 
                   if (task.isSuccessful()) {
                       Snapshot snapshot = task.getResult().getData();
@@ -483,6 +495,7 @@ public class CapacitorGameConnect {
                           return snapshot.getSnapshotContents().readFully();
                       } catch (IOException e) {
                           Log.e(TAG, "Error while reading Snapshot.", e);
+                          call.reject("Error while reading Snapshot: " + e.getMessage());
                       }
                   } else {
                       Log.e(TAG, "Failed loadSnapshot task");
