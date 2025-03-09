@@ -98,6 +98,10 @@ public class CapacitorGameConnect {
     int conflictResolutionPolicy = SnapshotsClient.RESOLUTION_POLICY_MOST_RECENTLY_MODIFIED;
 
     snapshotsClient.open(snapshotId, true, conflictResolutionPolicy)
+        .addOnFailureListener(e -> {
+            Log.e(TAG, "Error while opening Snapshot.", e);
+            call.reject("Error while opening Snapshot: " + e.getMessage());
+        })
         .addOnCompleteListener(task -> {
             if (task.isSuccessful()) {
                 Snapshot snapshot = null;
