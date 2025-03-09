@@ -95,45 +95,84 @@ public class CapacitorGameConnect {
     byte[] byteArray = data.getBytes(StandardCharsets.UTF_8);
 
     SnapshotsClient snapshotsClient = PlayGames.getSnapshotsClient(this.activity);
-    int conflictResolutionPolicy = SnapshotsClient.RESOLUTION_POLICY_MOST_RECENTLY_MODIFIED;
+    int conflictResolutionPolicy = SnapshotsClient.RESOLUTION_POLICY_MANUAL;
 
     snapshotsClient.open(snapshotId, true, conflictResolutionPolicy)
-        .addOnCompleteListener(task -> {
-            if (task.isSuccessful()) {
-                Snapshot snapshot = null;
-                try {
-                    snapshot = task.getResult().getData();
-
-                    if (snapshot != null) {
-
-                        //call of the method writeSnapshot params : the snapshot and the data we
-                        //want to save with a description
-                        Snapshot finalSnapshot = snapshot;
-                        writeSnapshot(snapshot, byteArray, "description")
-                                .addOnCompleteListener(t -> {
-                                    if (t.isSuccessful()) {
-                                        Log.i(TAG, "saveGame completed successful");
-                                    } else {
-                                        Log.e("ERR", "saveGame failed " + t.getException());
-                                    }
-                                }).addOnFailureListener(e -> {
-                                    snapshotsClient.discardAndClose(finalSnapshot);
-                                    Log.e(TAG, "Failed saveGame, writeSnapshot", e);
-                                    call.reject("Failed saveGame, writeSnapshot: " + e.getMessage());
-                                });
-                    }
-                } catch (Exception e) {
-                    if (snapshot !=null) {
-                        snapshotsClient.discardAndClose(snapshot);
-                    }
-                    Log.e(TAG, "Failed saveGame", e);
-                    call.reject("Failed saveGame: " + e.getMessage());
+        .addOnFailureListener(e -> {
+             Log.e(TAG, "Error while opening Snapshot.", e);
+             call.reject("Error while opening Snapshot: " + e.getMessage());
+        })
+            .addOnCompleteListener(task -> {
+                if (!task.isSuccessful()) {
+                    Log.e(TAG, "Failed to open snapshot for saving");
+                    call.reject("Failed to open snapshot for saving");
+                    return;
                 }
-            } else {
-                Log.e(TAG, "Failed saveGame task");
-                call.reject("Failed saveGame task");
-            }
-        });
+
+                DataOrConflict<Snapshot> result = task.getResult();
+
+                if (result.isConflict()) {
+                    // Conflict detected
+                    Log.i(TAG, "Conflict detected...");
+                    SnapshotsClient.SnapshotConflict conflict = result.getConflict();
+                    Snapshot snapshot = conflict.getSnapshot();
+                    Snapshot conflictingSnapshot = conflict.getConflictingSnapshot();
+
+                    try {
+                        byte[] existingData = snapshot.getSnapshotContents().readFully();
+                        byte[] conflictingData = conflictingSnapshot.getSnapshotContents().readFully();
+
+                        // Merge the snapshot data
+                        byte[] mergedData = mergeSnapshotData(existingData, conflictingData, byteArray);
+
+                        // Write merged data
+                        snapshot.getSnapshotContents().writeBytes(mergedData);
+
+                        snapshotsClient.resolveConflict(conflict.getConflictId(), snapshot)
+                                .addOnCompleteListener(resolveTask -> {
+                                    if (resolveTask.isSuccessful()) {
+                                        Log.i(TAG, "Conflict resolved, saving snapshot...");
+                                        writeSnapshot(snapshot, mergedData, "Merged data")
+                                                .addOnCompleteListener(t -> {
+                                                    if (t.isSuccessful()) {
+                                                        Log.i(TAG, "saveGame completed successfully");
+                                                    } else {
+                                                        Log.e("ERR", "saveGame failed " + t.getException());
+                                                        call.reject("Failed saveGame, writeSnapshot: ");
+                                                    }
+                                                })
+                                                .addOnFailureListener(e -> {
+                                                    snapshotsClient.discardAndClose(snapshot);
+                                                    Log.e(TAG, "Failed saveGame, writeSnapshot", e);
+                                                    call.reject("Failed saveGame, writeSnapshot: " + e.getMessage());
+                                                });
+                                    } else {
+                                        Log.e(TAG, "Failed to resolve conflict");
+                                        call.reject("Failed to resolve conflict.");
+                                    }
+                                });
+                    } catch (IOException e) {
+                        Log.e(TAG, "Error while merging snapshots.", e);
+                        call.reject("Error while merging snapshots: " + e.getMessage());
+                    }
+                } else {
+                    // No conflict, proceed with normal save
+                    Snapshot snapshot = result.getData();
+                    writeSnapshot(snapshot, byteArray, "Saving snapshot")
+                            .addOnCompleteListener(t -> {
+                                if (t.isSuccessful()) {
+                                    Log.i(TAG, "saveGame completed successfully");
+                                } else {
+                                    Log.e("ERR", "saveGame failed " + t.getException());
+                                }
+                            })
+                            .addOnFailureListener(e -> {
+                                snapshotsClient.discardAndClose(snapshot);
+                                Log.e(TAG, "Failed saveGame, writeSnapshot", e);
+                                call.reject("Failed saveGame, writeSnapshot: " + e.getMessage());
+                            });
+                }
+            });
   }
 
   public void loadGame(PluginCall call) {
@@ -469,7 +508,7 @@ public class CapacitorGameConnect {
       handler.postDelayed(timeoutRunnable, REQUEST_TIMEOUT_MS);
 
       // In the case of a conflict, the most recently modified version of this snapshot will be used.
-    int conflictResolutionPolicy = SnapshotsClient.RESOLUTION_POLICY_MOST_RECENTLY_MODIFIED;
+    int conflictResolutionPolicy = SnapshotsClient.RESOLUTION_POLICY_MANUAL;
 
       // Open the saved game using its name
     return snapshotsClient.open(snapshotID, true, conflictResolutionPolicy)
@@ -480,34 +519,184 @@ public class CapacitorGameConnect {
             handler.removeCallbacks(timeoutRunnable); // Cancel timeout
             call.reject("Error while opening Snapshot: " + e.getMessage());
           }
-        }).continueWith(new Continuation<DataOrConflict<Snapshot>, byte[]>() {
-          @Override
-          public byte[] then(@NonNull Task<DataOrConflict<Snapshot>> task) throws Exception {
-              try {
-                  handler.removeCallbacks(timeoutRunnable); // Cancel timeout
+        }) .continueWith(task -> {
+                try {
+                    handler.removeCallbacks(timeoutRunnable);
 
-                  if (task.isSuccessful()) {
-                      Snapshot snapshot = task.getResult().getData();
+                    if (!task.isSuccessful()) {
+                        Log.e(TAG, "Failed to load snapshot task");
+                        call.reject("Failed to load snapshot task.");
+                        return null;
+                    }
 
-                      // Opening the snapshot was a success and any conflicts have been resolved.
-                      try {
-                          // Extract the raw data from the snapshot.
-                          return snapshot.getSnapshotContents().readFully();
-                      } catch (IOException e) {
-                          Log.e(TAG, "Error while reading Snapshot.", e);
-                          call.reject("Error while reading Snapshot: " + e.getMessage());
-                      }
-                  } else {
-                      Log.e(TAG, "Failed loadSnapshot task");
-                      call.reject("Failed loadSnapshot task: ");
-                  }
+                    DataOrConflict<Snapshot> result = task.getResult();
 
-              } catch (Exception e) {
-                  Log.e(TAG, "Failed loadSnapshot", e);
-                  call.reject("Failed loadSnapshot: " + e.getMessage());
-              }
-              return null;
-          }
-        });
+                    if (result.isConflict()) {
+                        Log.i(TAG, "Conflict detected...");
+                        // Conflict detected
+                        SnapshotsClient.SnapshotConflict conflict = result.getConflict();
+                        Snapshot snapshot1 = conflict.getSnapshot();
+                        Snapshot snapshot2 = conflict.getConflictingSnapshot();
+
+                        // Read both snapshots
+                        byte[] data1 = snapshot1.getSnapshotContents().readFully();
+                        byte[] data2 = snapshot2.getSnapshotContents().readFully();
+
+                        // Merge data (custom logic needed here)
+                        byte[] mergedData = mergeSnapshotData(data1, data2);
+
+                        // Write merged data to snapshot1 (you can also create a new one)
+                        snapshot1.getSnapshotContents().writeBytes(mergedData);
+
+                        return snapshotsClient.resolveConflict(conflict.getConflictId(), snapshot1)
+                                .continueWith(resolveTask -> {
+                                    if (!resolveTask.isSuccessful()) {
+                                        Log.e(TAG, "Failed to resolve snapshot conflict");
+                                        call.reject("Failed to resolve snapshot conflict.");
+                                        return null;//TODO auto to null den tha etaksei NPE
+                                    }
+                                    Log.i(TAG, "Conflict resolved, loading snapshot...");
+                                    return mergedData;
+                                }).getResult();
+                    }
+
+                    // No conflict, return the snapshot data
+                    Snapshot snapshot = result.getData();
+                    return snapshot.getSnapshotContents().readFully();
+                } catch (IOException e) {
+                    Log.e(TAG, "Error while reading Snapshot.", e);
+                    call.reject("Error while reading Snapshot: " + e.getMessage());
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to load snapshot", e);
+                    call.reject("Failed to load snapshot: " + e.getMessage());
+                }
+                return null;
+            });
   }
+
+    private byte[] mergeSnapshotData(byte[] data1, byte[] data2) {
+        try {
+            String dataStr1 = new String(data1, StandardCharsets.UTF_8);
+            String dataStr2 = new String(data2, StandardCharsets.UTF_8);
+
+            String[] dataArray1 = dataStr1.split("\\|");
+            String[] dataArray2 = dataStr2.split("\\|");
+
+            String remove1 = dataArray1[29];
+            String starterPack1 = dataArray1[36];
+            String premiumPack1 = dataArray1[37];
+            String nowTimestamp1 = dataArray1[1];
+
+            String remove2 = dataArray2[29];
+            String starterPack2 = dataArray2[36];
+            String premiumPack2 = dataArray2[37];
+            String nowTimestamp2 = dataArray2[1];
+
+            if (premiumPack1.equals("true")) {
+                return data1;
+            }
+            if (premiumPack2.equals("true")) {
+                return data2;
+            }
+            if (starterPack1.equals("true")) {
+                return data1;
+            }
+            if (starterPack2.equals("true")) {
+                return data2;
+            }
+            if (remove1.equals("true")) {
+                return data1;
+            }
+            if (remove2.equals("true")) {
+                return data2;
+            }
+
+            if (Long.parseLong(nowTimestamp1) >= Long.parseLong(nowTimestamp2)) {
+                return data1;
+            } else {
+                return data2;
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error merging snapshot data", e);
+            return data1; // Return original data if merging fails
+        }
+    }
+
+    private byte[] mergeSnapshotData(byte[] data1, byte[] data2, byte[] data3) {
+        try {
+            String dataStr1 = new String(data1, StandardCharsets.UTF_8);
+            String dataStr2 = new String(data2, StandardCharsets.UTF_8);
+            String dataStr3 = new String(data3, StandardCharsets.UTF_8);
+
+            String[] dataArray1 = dataStr1.split("\\|");
+            String[] dataArray2 = dataStr2.split("\\|");
+            String[] dataArray3 = dataStr3.split("\\|");
+
+            String remove1 = dataArray1[29];
+            String starterPack1 = dataArray1[36];
+            String premiumPack1 = dataArray1[37];
+            String nowTimestamp1 = dataArray1[1];
+
+            String remove2 = dataArray2[29];
+            String starterPack2 = dataArray2[36];
+            String premiumPack2 = dataArray2[37];
+            String nowTimestamp2 = dataArray2[1];
+
+            String remove3 = dataArray3[29];
+            String starterPack3 = dataArray3[36];
+            String premiumPack3 = dataArray3[37];
+            String nowTimestamp3 = dataArray3[1];
+
+
+            if (premiumPack1.equals("true")) {
+                return data1;
+            }
+            if (premiumPack2.equals("true")) {
+                return data2;
+            }
+            if (premiumPack3.equals("true")) {
+                return data3;
+            }
+
+            if (starterPack1.equals("true")) {
+                return data1;
+            }
+            if (starterPack2.equals("true")) {
+                return data2;
+            }
+            if (starterPack3.equals("true")) {
+                return data3;
+            }
+
+            if (remove1.equals("true")) {
+                return data1;
+            }
+            if (remove2.equals("true")) {
+                return data2;
+            }
+            if (remove3.equals("true")) {
+                return data3;
+            }
+
+            if (Long.parseLong(nowTimestamp1) >= Long.parseLong(nowTimestamp2)) {
+                if (Long.parseLong(nowTimestamp1) >= Long.parseLong(nowTimestamp3)) {
+                    return data1;
+                } else {
+                    return data3;
+                }
+            } else {
+                if (Long.parseLong(nowTimestamp2) >= Long.parseLong(nowTimestamp3)) {
+                    return data2;
+                } else {
+                    return data3;
+                }
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error merging snapshot data", e);
+            return data1; // Return original data if merging fails
+        }
+    }
+
 }
