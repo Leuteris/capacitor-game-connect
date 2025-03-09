@@ -152,59 +152,13 @@ public class CapacitorGameConnectPlugin extends Plugin {
         Log.i("CapacitorGameConnect", "resolvePlayerData called");
         String playerId = player.getPlayerId();
         String playerName = player.getDisplayName();
-        Uri imageUri = player.getHiResImageUri();
-        if (imageUri == null) {
-            imageUri = player.getIconImageUri();
-        }
 
-        if (imageUri != null) {
-            Handler handler = new Handler(Looper.getMainLooper());
-            Runnable timeoutRunnable = () -> {
-                call.reject("resolvePlayerData onImageLoaded timed out");
-            };
+        JSObject ret = new JSObject();
+        ret.put("player_id", playerId);
+        ret.put("player_name", playerName);
+        ret.put("player_image", null);
+        call.resolve(ret);
 
-            handler.postDelayed(timeoutRunnable, 8000);
-            ImageManager imageManager = ImageManager.create(getContext());
-            imageManager.loadImage(new ImageManager.OnImageLoadedListener() {
-                @Override
-                public void onImageLoaded(Uri uri, Drawable drawable, boolean isImmediate) {
-                    try {
-                        handler.removeCallbacks(timeoutRunnable); // Cancel timeout
-                        Log.i("CapacitorGameConnect", "onImageLoaded called");
-                        if (drawable instanceof BitmapDrawable) {
-                            Bitmap bitmap = ((BitmapDrawable) drawable).getBitmap();
-
-                            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-                            bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
-                            byte[] byteArray = outputStream.toByteArray();
-                            String base64String = Base64.encodeToString(byteArray, Base64.DEFAULT);
-
-                            JSObject ret = new JSObject();
-                            ret.put("player_id", playerId);
-                            ret.put("player_name", playerName);
-                            ret.put("player_image", base64String);
-                            call.resolve(ret);
-                        } else {
-                            JSObject ret = new JSObject();
-                            ret.put("player_id", playerId);
-                            ret.put("player_name", playerName);
-                            ret.put("player_image", null);
-                            call.resolve(ret);
-                        }
-                        Log.i("CapacitorGameConnect", "onImageLoaded completed");
-                    } catch (Exception e) {
-                        Log.e(TAG, "Failed onImageLoaded", e);
-                        call.reject("Failed onImageLoaded: " + e.getMessage());
-                    }
-                }
-            }, imageUri);
-        } else {
-            JSObject ret = new JSObject();
-            ret.put("player_id", playerId);
-            ret.put("player_name", playerName);
-            ret.put("player_image", null);
-            call.resolve(ret);
-        }
         Log.i("CapacitorGameConnect", "resolvePlayerData completed");
     }
 
