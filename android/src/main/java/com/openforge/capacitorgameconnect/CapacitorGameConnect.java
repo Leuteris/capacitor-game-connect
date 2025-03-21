@@ -398,21 +398,31 @@ public class CapacitorGameConnect {
         }
     }*/
 
-    private void signIn(SignInCallback resultCallback, GamesSignInClient gamesSignInClient) {
-        gamesSignInClient
+  private void signIn(SignInCallback resultCallback, GamesSignInClient gamesSignInClient) {
+    gamesSignInClient
+        .isAuthenticated()
+        .addOnCompleteListener(isAuthenticatedTask -> {
+          boolean isAuthenticated = isAuthenticatedTask.isSuccessful() && isAuthenticatedTask.getResult().isAuthenticated();
+
+          if (isAuthenticated) {
+            Log.i(TAG, "User is already authenticated");
+            resultCallback.success(true);
+          } else {
+            Log.i(TAG, "User is not authenticated, attempting sign-in");
+            gamesSignInClient
                 .signIn()
-                .addOnCompleteListener(
-                        data -> {
-                            boolean isAuthenticated = (data.isSuccessful() && data.getResult().isAuthenticated());
-
-                            Log.i(TAG, "Sign-in completed successful, isAuthenticated: " + isAuthenticated);
-                            resultCallback.success(isAuthenticated);
-                        }
-                )
+                .addOnCompleteListener(data -> {
+                  boolean signedIn = data.isSuccessful() && data.getResult().isAuthenticated();
+                  Log.i(TAG, "Sign-in completed successfully, isAuthenticated: " + signedIn);
+                  resultCallback.success(signedIn);
+                })
                 .addOnFailureListener(e -> onSignInFailure(resultCallback, e));
-    }
+          }
+        });
+  }
 
-    private static void onSignInFailure(SignInCallback resultCallback, Exception e) {
+
+  private static void onSignInFailure(SignInCallback resultCallback, Exception e) {
         if (e instanceof ApiException) {
             Log.i(TAG, "User sign-in failed...");
             ApiException apiException = (ApiException) e;
