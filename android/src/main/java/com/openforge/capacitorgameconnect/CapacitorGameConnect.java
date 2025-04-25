@@ -37,7 +37,7 @@ public class CapacitorGameConnect {
     private AppCompatActivity activity;
     private static final String TAG = "CapacitorGameConnect";
 
-    private static final long REQUEST_TIMEOUT_MS = 8000;
+    private static final long REQUEST_TIMEOUT_MS = 15000;
 
     private double TAU = 0.75d;
     private double defaultVolatility = 0.09d;
@@ -150,6 +150,7 @@ public class CapacitorGameConnect {
         .addOnSuccessListener(data -> {
             if (data == null) {
                 call.reject("Loading snapshot null");
+                return;
             }
             Log.i(TAG, "load game completed successfully: " + new String(data));
             JSObject result = new JSObject();
