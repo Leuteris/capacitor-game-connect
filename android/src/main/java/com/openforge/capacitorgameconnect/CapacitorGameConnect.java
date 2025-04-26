@@ -152,7 +152,7 @@ public class CapacitorGameConnect {
                 call.reject("Loading snapshot null");
                 return;
             }
-            Log.i(TAG, "load game completed successfully: " + new String(data));
+            Log.i(TAG, "load game completed successfully: ");
             JSObject result = new JSObject();
             result.put("snapshot_data", new String(data));
             call.resolve(result);
