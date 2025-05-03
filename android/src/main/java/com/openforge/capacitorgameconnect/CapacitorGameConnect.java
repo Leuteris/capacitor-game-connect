@@ -12,6 +12,7 @@ import com.getcapacitor.PluginCall;
 import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.common.api.CommonStatusCodes;
 import com.google.android.gms.games.AnnotatedData;
+import com.google.android.gms.games.AuthenticationResult;
 import com.google.android.gms.games.GamesSignInClient;
 import com.google.android.gms.games.PlayGames;
 import com.google.android.gms.games.SnapshotsClient;
@@ -399,29 +400,23 @@ public class CapacitorGameConnect {
         }
     }*/
 
-  private void signIn(SignInCallback resultCallback, GamesSignInClient gamesSignInClient) {
-    gamesSignInClient
-        .isAuthenticated()
-        .addOnCompleteListener(isAuthenticatedTask -> {
-          boolean isAuthenticated = isAuthenticatedTask.isSuccessful() && isAuthenticatedTask.getResult().isAuthenticated();
-
-          if (isAuthenticated) {
-            Log.i(TAG, "User is already authenticated");
-            resultCallback.success(true);
-          } else {
-            Log.i(TAG, "User is not authenticated, attempting sign-in");
-            gamesSignInClient
+    private void signIn(SignInCallback resultCallback, GamesSignInClient gamesSignInClient) {
+        gamesSignInClient
                 .signIn()
                 .addOnCompleteListener(data -> {
-                  boolean signedIn = data.isSuccessful() && data.getResult().isAuthenticated();
-                  Log.i(TAG, "Sign-in completed successfully, isAuthenticated: " + signedIn);
-                  resultCallback.success(signedIn);
+                    if (!data.isSuccessful()) {
+                        Log.w(TAG, "Sign-in failed", data.getException());
+                        resultCallback.success(false);
+                        return;
+                    }
+
+                    AuthenticationResult result = data.getResult();
+                    boolean signedIn = result != null && result.isAuthenticated();
+                    Log.i(TAG, "Sign-in completed successfully, isAuthenticated: " + signedIn);
+                    resultCallback.success(signedIn);
                 })
                 .addOnFailureListener(e -> onSignInFailure(resultCallback, e));
-          }
-        });
-  }
-
+    }
 
   private static void onSignInFailure(SignInCallback resultCallback, Exception e) {
         if (e instanceof ApiException) {
