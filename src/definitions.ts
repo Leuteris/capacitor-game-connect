@@ -1,6 +1,7 @@
 import type { PlayerScore } from './interfaces/player-score.interface';
 import { SnapshotData } from './interfaces/snapshot-data.interface';
 import { Rating } from './interfaces/rating.interface';
+import { UserConsent } from './interfaces/user-consent';
 
 export interface CapacitorGameConnectPlugin {
   /**
@@ -33,6 +34,8 @@ export interface CapacitorGameConnectPlugin {
   saveGame(options: { snapshotID: string, data: string }): Promise<void>;
 
   loadGame(options: { snapshotID: string }): Promise<SnapshotData>;
+
+  canShowPersonalizedAds(): Promise<UserConsent>;
 
   /**
    * * Method to submit a score to the Google Play Services SDK

@@ -150,6 +150,7 @@ Before use the `Achievement Methods` of the plugin, you need to setup your Achie
 * [`showLeaderboard(...)`](#showleaderboard)
 * [`saveGame(...)`](#savegame)
 * [`loadGame(...)`](#loadgame)
+* [`canShowPersonalizedAds()`](#canshowpersonalizedads)
 * [`submitScore(...)`](#submitscore)
 * [`showAchievements()`](#showachievements)
 * [`unlockAchievement(...)`](#unlockachievement)
@@ -244,6 +245,17 @@ loadGame(options: { snapshotID: string; }) => Promise<SnapshotData>
 --------------------
 
 
+### canShowPersonalizedAds()
+
+```typescript
+canShowPersonalizedAds() => Promise<UserConsent>
+```
+
+**Returns:** <code>Promise&lt;<a href="#userconsent">UserConsent</a>&gt;</code>
+
+--------------------
+
+
 ### submitScore(...)
 
 ```typescript
@@ -333,6 +345,13 @@ getUserTotalScore(options: { leaderboardID: string; }) => Promise<PlayerScore>
 | Prop                | Type                |
 | ------------------- | ------------------- |
 | **`snapshot_data`** | <code>string</code> |
+
+
+#### UserConsent
+
+| Prop          | Type                 |
+| ------------- | -------------------- |
+| **`consent`** | <code>boolean</code> |
 
 
 #### PlayerScore

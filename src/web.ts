@@ -5,6 +5,7 @@ import type { PlayerScore } from './interfaces/player-score.interface';
 import type { User } from './interfaces/user.interface';
 import { SnapshotData } from './interfaces/snapshot-data.interface';
 import { Rating } from './interfaces/rating.interface';
+import { UserConsent } from './interfaces/user-consent';
 
 export class CapacitorGameConnectWeb
   extends WebPlugin
@@ -47,6 +48,12 @@ export class CapacitorGameConnectWeb
     console.info('load game function has been called', options);
     return Promise.resolve({} as SnapshotData);
   }
+
+  async canShowPersonalizedAds(): Promise<UserConsent> {
+    console.info('canShowPersonalizedAds function has been called');
+    return Promise.resolve({} as UserConsent);
+  }
+
 
     /**
    * * Method to submit a score to the Google Play Services SDK

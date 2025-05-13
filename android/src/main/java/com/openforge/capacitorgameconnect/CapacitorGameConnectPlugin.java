@@ -206,6 +206,16 @@ public class CapacitorGameConnectPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void canShowPersonalizedAds(PluginCall call) {
+        try {
+            implementation.canShowPersonalizedAds(call);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed canShowPersonalizedAds", e);
+            call.reject("Failed canShowPersonalizedAds: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
     public void showAchievements(PluginCall call) {
         implementation.showAchievements(this.startActivityIntent);
         call.resolve();

@@ -1,8 +1,10 @@
 package com.openforge.capacitorgameconnect;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
+import android.preference.PreferenceManager;
 import android.util.Log;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.annotation.NonNull;
@@ -30,8 +32,12 @@ import com.openforge.capacitorgameconnect.glicko2.Rating;
 import com.openforge.capacitorgameconnect.glicko2.RatingCalculator;
 import com.openforge.capacitorgameconnect.glicko2.RatingPeriodResults;
 
+import org.json.JSONObject;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 public class CapacitorGameConnect {
 
@@ -168,6 +174,37 @@ public class CapacitorGameConnect {
             }
         );
   }
+
+    public void canShowPersonalizedAds(PluginCall call) {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(activity.getApplicationContext());
+        String purposeConsent = prefs.getString("IABTCF_PurposeConsents", "");
+        String vendorConsent = prefs.getString("IABTCF_VendorConsents", "");
+        String vendorLI = prefs.getString("IABTCF_VendorLegitimateInterests", "");
+        String purposeLI = prefs.getString("IABTCF_PurposeLegitimateInterests", "");
+
+        int googleId = 755;
+        boolean hasGoogleVendorConsent = hasAttribute(vendorConsent, googleId);
+        boolean hasGoogleVendorLI = hasAttribute(vendorLI, googleId);
+
+        List<Integer> indexes = new ArrayList<>();
+        indexes.add(1);
+        indexes.add(3);
+        indexes.add(4);
+
+        List<Integer> indexesLI = new ArrayList<>();
+        indexesLI.add(2);
+        indexesLI.add(7);
+        indexesLI.add(9);
+        indexesLI.add(10);
+
+        boolean consent = hasConsentFor(indexes, purposeConsent, hasGoogleVendorConsent)
+                && hasConsentOrLegitimateInterestFor(indexesLI, purposeConsent, purposeLI, hasGoogleVendorConsent, hasGoogleVendorLI);
+
+        Log.i(TAG, "canShowPersonalizedAds completed successfully, consent: " + consent);
+        JSObject result = new JSObject();
+        result.put("consent", consent);
+        call.resolve(result);
+    }
 
     /**
      * * Method to fetch the logged in Player
@@ -520,4 +557,89 @@ public class CapacitorGameConnect {
           }
         });
   }
+
+    private boolean hasAttribute(String input, int index) {
+        if (input == null) {
+            Log.i(TAG, "hasAttribute: index " + index + " input is NULL!");
+            return false;
+        }
+        if( input.length() >= index ) {
+            Log.i(TAG, "hasAttribute: index " + index + " input " + input + " input.charAt(index-1) " + input.charAt(index-1));
+        } else {
+            Log.i(TAG, "hasAttribute: index " + index + " is MISSING!");
+        }
+        return input.length() >= index && input.charAt(index-1) == '1';
+    }
+
+    private boolean hasConsentFor(List<Integer> indexes, String purposeConsent, boolean hasVendorConsent) {
+        for (Integer p: indexes) {
+            if (!hasAttribute(purposeConsent, p)) {
+                Log.i(TAG, "hasConsentFor: denied for purpose #" + p );
+                return false;
+            }
+        }
+        return hasVendorConsent;
+    }
+
+    private boolean hasConsentOrLegitimateInterestFor(List<Integer> indexes, String purposeConsent, String purposeLI, boolean hasVendorConsent, boolean hasVendorLI){
+        for (Integer p: indexes) {
+            boolean purposeAndVendorLI = hasAttribute(purposeLI, p) && hasVendorLI;
+            boolean purposeConsentAndVendorConsent = hasAttribute(purposeConsent, p) && hasVendorConsent;
+            boolean isOk = purposeAndVendorLI || purposeConsentAndVendorConsent;
+            if (!isOk){
+                Log.i(TAG, "hasConsentOrLegitimateInterestFor: denied for #" + p);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private int getGdprApplies(){
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(activity.getApplicationContext());
+        int gdprApplies = prefs.getInt("IABTCF_gdprApplies", -1);
+        return gdprApplies;
+    }
+
+ /*
+    private boolean canShowAds(){
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(activity.getApplicationContext());
+        String purposeConsent = prefs.getString("IABTCF_PurposeConsents", "");
+        Log.i(TAG, "purposeConsent " + purposeConsent);
+        String vendorConsent = prefs.getString("IABTCF_VendorConsents","");
+        Log.i(TAG, "vendorConsent " + vendorConsent);
+        String vendorLI = prefs.getString("IABTCF_VendorLegitimateInterests","");
+        Log.i(TAG, "vendorLI " + vendorLI);
+        String purposeLI = prefs.getString("IABTCF_PurposeLegitimateInterests","");
+        Log.i(TAG, "purposeLI " + purposeLI);
+
+        int googleId = 755;
+        boolean hasGoogleVendorConsent = hasAttribute(vendorConsent, googleId);
+        Log.i(TAG, "hasGoogleVendorConsent " + hasGoogleVendorConsent);
+        boolean hasGoogleVendorLI = hasAttribute(vendorLI, googleId);
+        Log.i(TAG, "hasGoogleVendorLI " + hasGoogleVendorLI);
+
+        List<Integer> indexes = new ArrayList<>();
+        indexes.add(1);
+
+        List<Integer> indexesLI = new ArrayList<>();
+        indexesLI.add(2);
+        indexesLI.add(7);
+        indexesLI.add(9);
+        indexesLI.add(10);
+
+        return hasConsentFor(indexes, purposeConsent, hasGoogleVendorConsent)
+                && hasConsentOrLegitimateInterestFor(indexesLI, purposeConsent, purposeLI, hasGoogleVendorConsent, hasGoogleVendorLI);
+
+    }
+
+    private void execute() {
+        boolean canShowAds = this.canShowAds();
+        Log.i(TAG, "canShowAds response: " + canShowAds);
+
+        boolean canShowPersonalizedAds = this.canShowPersonalizedAds();
+        Log.i(TAG, "canShowPersonalizedAds response: " + canShowPersonalizedAds);
+    }
+
+  */
+
 }
