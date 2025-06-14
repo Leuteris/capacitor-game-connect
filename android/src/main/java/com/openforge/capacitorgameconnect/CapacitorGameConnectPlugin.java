@@ -185,6 +185,17 @@ public class CapacitorGameConnectPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void getDeviceBootTime(PluginCall call) {
+        try {
+            implementation.getDeviceBootTime(call);
+            call.resolve();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed getDeviceBootTime", e);
+            call.reject("Failed getDeviceBootTime: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
     public void loadGame(PluginCall call) {
         try {
             implementation.loadGame(call);

@@ -1,7 +1,8 @@
+import type { DeviceInfo } from './interfaces/deviceInfo';
 import type { PlayerScore } from './interfaces/player-score.interface';
-import { SnapshotData } from './interfaces/snapshot-data.interface';
-import { Rating } from './interfaces/rating.interface';
-import { UserConsent } from './interfaces/user-consent';
+import type { Rating } from './interfaces/rating.interface';
+import type { SnapshotData } from './interfaces/snapshot-data.interface';
+import type { UserConsent } from './interfaces/user-consent';
 
 export interface CapacitorGameConnectPlugin {
   /**
@@ -36,6 +37,8 @@ export interface CapacitorGameConnectPlugin {
   loadGame(options: { snapshotID: string }): Promise<SnapshotData>;
 
   canShowPersonalizedAds(): Promise<UserConsent>;
+
+  getDeviceBootTime(): Promise<DeviceInfo>;
 
   /**
    * * Method to submit a score to the Google Play Services SDK

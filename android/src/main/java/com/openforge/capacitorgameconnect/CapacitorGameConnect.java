@@ -1,10 +1,13 @@
 package com.openforge.capacitorgameconnect;
 
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.preference.PreferenceManager;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.annotation.NonNull;
@@ -91,6 +94,12 @@ public class CapacitorGameConnect {
                         }
                 )
                 .addOnFailureListener(e -> resultCallback.error(e.getMessage()));
+    }
+
+    public void getDeviceBootTime(PluginCall call){
+      JSObject result = new JSObject();
+      result.put("bootTime", SystemClock.elapsedRealtime());
+      call.resolve(result);
     }
 
   public void saveGame(PluginCall call) {

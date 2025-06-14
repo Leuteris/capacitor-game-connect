@@ -1,11 +1,12 @@
 import { WebPlugin } from '@capacitor/core';
 
 import type { CapacitorGameConnectPlugin } from './definitions';
+import type { DeviceInfo} from './interfaces/deviceInfo';
 import type { PlayerScore } from './interfaces/player-score.interface';
+import type { Rating } from './interfaces/rating.interface';
+import type { SnapshotData } from './interfaces/snapshot-data.interface';
+import type { UserConsent } from './interfaces/user-consent';
 import type { User } from './interfaces/user.interface';
-import { SnapshotData } from './interfaces/snapshot-data.interface';
-import { Rating } from './interfaces/rating.interface';
-import { UserConsent } from './interfaces/user-consent';
 
 export class CapacitorGameConnectWeb
   extends WebPlugin
@@ -52,6 +53,11 @@ export class CapacitorGameConnectWeb
   async canShowPersonalizedAds(): Promise<UserConsent> {
     console.info('canShowPersonalizedAds function has been called');
     return Promise.resolve({} as UserConsent);
+  }
+
+  async getDeviceBootTime(): Promise<DeviceInfo> {
+    console.info('getDeviceBootTime function has been called');
+    return Promise.resolve({} as DeviceInfo);
   }
 
 

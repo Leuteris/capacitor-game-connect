@@ -151,6 +151,7 @@ Before use the `Achievement Methods` of the plugin, you need to setup your Achie
 * [`saveGame(...)`](#savegame)
 * [`loadGame(...)`](#loadgame)
 * [`canShowPersonalizedAds()`](#canshowpersonalizedads)
+* [`getDeviceBootTime()`](#getdeviceboottime)
 * [`submitScore(...)`](#submitscore)
 * [`showAchievements()`](#showachievements)
 * [`unlockAchievement(...)`](#unlockachievement)
@@ -256,6 +257,17 @@ canShowPersonalizedAds() => Promise<UserConsent>
 --------------------
 
 
+### getDeviceBootTime()
+
+```typescript
+getDeviceBootTime() => Promise<DeviceInfo>
+```
+
+**Returns:** <code>Promise&lt;<a href="#deviceinfo">DeviceInfo</a>&gt;</code>
+
+--------------------
+
+
 ### submitScore(...)
 
 ```typescript
@@ -352,6 +364,13 @@ getUserTotalScore(options: { leaderboardID: string; }) => Promise<PlayerScore>
 | Prop          | Type                 |
 | ------------- | -------------------- |
 | **`consent`** | <code>boolean</code> |
+
+
+#### DeviceInfo
+
+| Prop           | Type                |
+| -------------- | ------------------- |
+| **`bootTime`** | <code>number</code> |
 
 
 #### PlayerScore
